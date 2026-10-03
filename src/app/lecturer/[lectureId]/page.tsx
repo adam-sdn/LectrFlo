@@ -3,10 +3,18 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ConfusionMeter, JoinCodeCard, LectureControls, QuestionFeed, StudentsCard } from "@/components/lecturer/panels";
+import {
+  ConfusionMeter,
+  JoinCodeCard,
+  JoinPresentation,
+  LectureControls,
+  LiveSignals,
+  QuestionFeed,
+  StudentsCard,
+} from "@/components/lecturer/panels";
 import { ReportView } from "@/components/lecturer/report-view";
 import { SlideViewer } from "@/components/slide-viewer";
-import { AppHeader, Button, ConnectionDot, ErrorNotice, LoadingScreen, StatusBadge } from "@/components/ui";
+import { AppHeader, Button, ConnectionDot, ErrorNotice, LoadingScreen, StatusBadge, splitTitle } from "@/components/ui";
 import { useCoalescedRefresh, useInterval, useRealtimeChannel } from "@/lib/client/hooks";
 import { ClientApiError, errorMessage } from "@/lib/client/http";
 import { lecturerApi } from "@/lib/client/lecturer-api";
@@ -30,6 +38,7 @@ export default function LecturerConsole() {
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [urlCache] = useState(createSlideUrlCache);
+  const [presenting, setPresenting] = useState(false);
   // Bumped by every fetch and local change; a response is applied only if nothing newer happened meanwhile.
   const detailVersion = useRef(0);
   const confusionVersion = useRef(0);
@@ -183,6 +192,13 @@ export default function LecturerConsole() {
     return () => window.removeEventListener("keydown", onKey);
   }, [detail, goToSlide]);
 
+  useEffect(() => {
+    if (!presenting) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPresenting(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [presenting]);
+
   if (!detail) {
     return (
       <>
@@ -190,7 +206,7 @@ export default function LecturerConsole() {
         {loadError ? (
           <main className="mx-auto max-w-xl space-y-4 px-4 py-16">
             <ErrorNotice message={loadError} onRetry={refreshAll} />
-            <Link href="/lecturer" className="text-sm font-semibold text-indigo-600">
+            <Link href="/lecturer" className="text-sm font-medium text-ai-bright hover:text-fg">
               ← Back to lectures
             </Link>
           </main>
@@ -202,21 +218,35 @@ export default function LecturerConsole() {
   }
 
   const slide = detail.slides.find((s) => s.slideNumber === detail.currentSlide);
+  const { course, topic } = splitTitle(detail.title);
+  const ended = detail.status === "ended";
 
   return (
     <>
-      <AppHeader role="Lecturer">
-        {detail.status !== "ended" && <ConnectionDot status={hostStatus} />}
-        <Link href="/lecturer" className="text-sm font-medium text-slate-600 hover:text-slate-900">
+      <AppHeader
+        role="Lecturer"
+        title={
+          <>
+            <p className="min-w-0 truncate text-sm">
+              <span className="font-medium text-fg">{course}</span>
+              {topic && <span className="text-muted"> · {topic}</span>}
+            </p>
+            <StatusBadge status={detail.status} />
+          </>
+        }
+      >
+        {!ended && <ConnectionDot status={hostStatus} />}
+        <Link href="/lecturer" className="text-sm text-muted transition hover:text-fg">
           All lectures
         </Link>
       </AppHeader>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:py-8">
+        {/* Title on small screens (the header shows it from md up). */}
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 md:hidden">
           <div className="min-w-0">
-            {detail.module && <p className="text-sm font-medium text-indigo-600">{detail.module}</p>}
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{detail.title}</h1>
+            {detail.module && <p className="text-xs text-muted">{detail.module}</p>}
+            <h1 className="text-xl font-semibold tracking-tight">{detail.title}</h1>
           </div>
           <StatusBadge status={detail.status} />
         </div>
@@ -227,17 +257,31 @@ export default function LecturerConsole() {
           </div>
         )}
 
-        {detail.status === "ended" ? (
-          <ReportView lectureId={detail.id} />
+        {ended ? (
+          <ReportView lectureId={detail.id} title={detail.title} module={detail.module} slideCount={detail.slideCount} />
         ) : (
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
-              <SlideViewer
-                slide={slide}
-                slideNumber={detail.currentSlide}
-                slideCount={detail.slideCount}
-                onImageError={onImageError}
-              />
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
+            <div className="min-w-0 space-y-4">
+              {detail.status === "lobby" ? (
+                <div className="relative overflow-hidden rounded-2xl border border-line bg-surface">
+                  <div className="pointer-events-none absolute inset-0" aria-hidden>
+                    <div className="ambient-glow opacity-70" />
+                  </div>
+                  <div className="relative flex aspect-video items-center justify-center">
+                    <JoinPresentation joinCode={detail.joinCode} studentCount={detail.participantCount} compact />
+                  </div>
+                  <p className="relative border-t border-line bg-surface px-4 py-2.5 text-xs text-muted">
+                    Lobby is open — students join with this code. Start the lecture to show slide {detail.currentSlide}.
+                  </p>
+                </div>
+              ) : (
+                <SlideViewer
+                  slide={slide}
+                  slideNumber={detail.currentSlide}
+                  slideCount={detail.slideCount}
+                  onImageError={onImageError}
+                />
+              )}
               <div className="flex items-center justify-between gap-3">
                 <Button
                   variant="secondary"
@@ -247,10 +291,15 @@ export default function LecturerConsole() {
                 >
                   ← Previous
                 </Button>
-                <span className="text-sm font-medium tabular-nums text-slate-600">
+                <span className="hidden text-xs text-faint sm:inline">
+                  Use <kbd className="rounded border border-line-strong px-1.5 py-0.5 font-sans text-muted">←</kbd>{" "}
+                  <kbd className="rounded border border-line-strong px-1.5 py-0.5 font-sans text-muted">→</kbd> or a clicker
+                </span>
+                <span className="text-sm tabular-nums text-muted sm:hidden">
                   {detail.slideCount > 0 ? `${detail.currentSlide} / ${detail.slideCount}` : "No slides"}
                 </span>
                 <Button
+                  variant="secondary"
                   onClick={() => goToSlide(detail.currentSlide + 1)}
                   disabled={detail.currentSlide >= detail.slideCount || busy !== null}
                   aria-label="Next slide"
@@ -261,15 +310,41 @@ export default function LecturerConsole() {
               <QuestionFeed questions={questions} error={signalsError} />
             </div>
 
-            <div className="space-y-4">
+            <aside className="space-y-4" aria-label="Classroom">
               <LectureControls status={detail.status} busy={busy} onAction={runAction} />
-              <ConfusionMeter summary={confusion} participantCount={detail.participantCount} />
-              <JoinCodeCard joinCode={detail.joinCode} status={detail.status} />
+              <LiveSignals studentCount={detail.participantCount} summary={confusion} questionCount={questions.length} />
+              <JoinCodeCard joinCode={detail.joinCode} status={detail.status} onPresent={() => setPresenting(true)} />
+              <ConfusionMeter summary={confusion} participantCount={detail.participantCount} slideCount={detail.slideCount} />
               <StudentsCard count={detail.participantCount} participants={detail.participants} />
-            </div>
+            </aside>
           </div>
         )}
       </main>
+
+      {presenting && !ended && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Join this lecture"
+          className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-canvas/95 backdrop-blur-sm"
+          onClick={() => setPresenting(false)}
+        >
+          <div className="pointer-events-none absolute inset-0" aria-hidden>
+            <div className="ambient-glow" />
+          </div>
+          <div className="relative animate-fade-up" onClick={(e) => e.stopPropagation()}>
+            <JoinPresentation joinCode={detail.joinCode} studentCount={detail.participantCount} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setPresenting(false)}
+            className="absolute top-5 right-5 rounded-lg px-3 py-1.5 text-sm text-muted ring-1 ring-line-strong transition hover:text-fg"
+            autoFocus
+          >
+            Close <span className="text-faint">Esc</span>
+          </button>
+        </div>
+      )}
     </>
   );
 }

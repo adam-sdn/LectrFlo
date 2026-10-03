@@ -53,7 +53,7 @@ Pages (client components using `src/lib/client/*` to call the API):
 
 | Route | Who | Purpose |
 | --- | --- | --- |
-| `/` | everyone | Choose student or lecturer |
+| `/` | everyone | Landing page: Start a Lecture (→ `/lecturer`) or Join a Lecture (→ `/join`) |
 | `/lecturer` | lecturer | List lectures, create the demo lecture |
 | `/lecturer/[lectureId]` | lecturer | Live console: slides, lifecycle, students, confusion meter, questions; AI insight report after ending |
 | `/join` (`?code=`) | student | Join with code + display name |
@@ -64,4 +64,8 @@ Pages (client components using `src/lib/client/*` to call the API):
 - Live updates come from the realtime channels in `docs/API.md`; pages also poll as a fallback.
 - The demo lecture is built in the browser (`src/lib/client/demo-lecture.ts`): slides are drawn on a
   canvas and uploaded as PNGs through the normal slide upload endpoint.
-- Styling: Tailwind CSS v4.
+- Styling: Tailwind CSS v4, dark-only. Design tokens and motion keyframes live in `@theme` in
+  `src/app/globals.css`. Use the semantic colours (`ai` violet, `live` cyan, `confused` pink,
+  `success` green) for state and keep the rest neutral (`canvas`, `surface`, `fg`, `muted`, `line`).
+  Shared primitives are in `src/components/ui.tsx`; count-up/reveal helpers in `src/components/motion.tsx`.
+- Join QR codes are generated in the browser by `src/lib/client/qr.ts` (no dependency).

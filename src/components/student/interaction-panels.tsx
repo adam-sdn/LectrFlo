@@ -19,7 +19,7 @@ export function ConfusedButton({ lectureId, live, currentSlide }: { lectureId: s
     try {
       const res = await studentApi.confused(lectureId);
       startCooldown(res.cooldownSeconds);
-      setMessage({ tone: "ok", text: `Got it — your lecturer sees an anonymous count for slide ${res.slideNumber}.` });
+      setMessage({ tone: "ok", text: `Your lecturer sees an anonymous signal for slide ${res.slideNumber}.` });
     } catch (err) {
       if (err instanceof ClientApiError && err.code === "cooldown") {
         startCooldown(err.retryAfterSeconds ?? 30);
@@ -32,22 +32,37 @@ export function ConfusedButton({ lectureId, live, currentSlide }: { lectureId: s
     }
   }
 
+  const sent = cooldown > 0;
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <div className="rounded-2xl border border-line bg-surface p-4">
       <button
         type="button"
         onClick={send}
-        disabled={!live || sending || cooldown > 0}
-        className="flex w-full items-center justify-center gap-3 rounded-xl bg-amber-400 px-6 py-4 text-lg font-bold text-amber-950 shadow-sm transition hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        disabled={!live || sending || sent}
+        className={`relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-xl px-6 py-4 text-base font-medium transition duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-confused disabled:cursor-not-allowed ${
+          sent
+            ? "animate-press bg-confused/[0.08] text-confused ring-1 ring-inset ring-confused/30"
+            : live
+              ? "bg-confused/[0.14] text-[#fecdd3] ring-1 ring-inset ring-confused/45 hover:-translate-y-px hover:bg-confused/[0.22] hover:shadow-[0_10px_30px_-14px_rgb(251_113_133/0.8)] active:scale-[0.98]"
+              : "bg-white/[0.04] text-faint ring-1 ring-inset ring-line"
+        }`}
       >
-        {sending ? <Spinner className="size-5" /> : <span aria-hidden>🤔</span>}
-        {cooldown > 0 ? `Signal sent (${cooldown}s)` : "I'm confused"}
+        {sent && <span className="pointer-events-none absolute inset-0 animate-ripple rounded-xl bg-confused/30" aria-hidden />}
+        {sending ? (
+          <Spinner className="size-5" />
+        ) : sent ? (
+          <span aria-hidden>✓</span>
+        ) : (
+          <span aria-hidden className="flex size-6 items-center justify-center rounded-full bg-confused text-sm font-semibold text-[#2a0a12]">?</span>
+        )}
+        {sent ? "Confusion signal sent" : "I'm Confused"}
+        {sent && <span className="text-xs font-normal tabular-nums text-confused/70">{cooldown}s</span>}
       </button>
-      <p className="mt-2 text-center text-xs text-slate-500" aria-live="polite">
+      <p className="mt-2.5 min-h-4 text-center text-xs text-muted" aria-live="polite">
         {message ? (
-          <span className={message.tone === "ok" ? "text-emerald-700" : "text-rose-700"}>{message.text}</span>
+          <span className={`inline-block animate-fade-in ${message.tone === "ok" ? "text-fg-2" : "text-confused"}`}>{message.text}</span>
         ) : live ? (
-          `Anonymous. Tells your lecturer slide ${currentSlide} needs another look — no need to type a question.`
+          `Anonymous · tells your lecturer slide ${currentSlide} needs another look.`
         ) : (
           "Available while the lecture is live."
         )}
@@ -97,7 +112,7 @@ export function AskLecturer({ lectureId, live }: { lectureId: string; live: bool
   }
 
   return (
-    <Card title="💬 Ask the lecturer" action={<span className="text-xs text-slate-500">Anonymous</span>}>
+    <Card title="Ask the lecturer" action={<span className="text-xs text-muted">Anonymous</span>}>
       <form onSubmit={submit} className="flex gap-2">
         <label htmlFor="lecturer-question" className="sr-only">
           Question for the lecturer
@@ -112,7 +127,7 @@ export function AskLecturer({ lectureId, live }: { lectureId: string; live: bool
           maxLength={1000}
           disabled={!live}
           placeholder={live ? "Ask a question about this slide…" : "Available while the lecture is live"}
-          className="min-w-0 flex-1 rounded-lg border-0 px-3 py-2 text-sm ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50"
+          className="min-w-0 flex-1 rounded-xl border-0 bg-canvas/60 px-3.5 py-2.5 text-sm text-fg ring-1 ring-line-strong transition placeholder:text-faint focus:ring-2 focus:ring-ai focus:outline-none disabled:opacity-60"
         />
         <Button type="submit" variant="secondary" disabled={!live || sending}>
           {sending ? <Spinner /> : "Send"}
@@ -120,14 +135,14 @@ export function AskLecturer({ lectureId, live }: { lectureId: string; live: bool
       </form>
       <div className="mt-2 text-xs" aria-live="polite">
         {error && <ErrorNotice message={error} />}
-        {sent && <span className="text-emerald-700">Sent to your lecturer.</span>}
+        {sent && <span className="inline-block animate-fade-in text-success">✓ Sent to your lecturer</span>}
       </div>
       {questions.length > 0 && (
         <ul className="mt-3 space-y-1.5" aria-label="Your questions">
           {[...questions].reverse().slice(0, 4).map((q) => (
-            <li key={q.id} className="flex items-start justify-between gap-2 text-sm">
-              <span className="text-slate-700">{q.body}</span>
-              <span className={`shrink-0 text-xs ${q.status === "answered" ? "text-emerald-700" : "text-slate-400"}`}>
+            <li key={q.id} className="flex animate-fade-in items-start justify-between gap-2 text-sm">
+              <span className="text-fg-2">{q.body}</span>
+              <span className={`shrink-0 text-xs ${q.status === "answered" ? "text-success" : "text-faint"}`}>
                 {q.status === "answered" ? "Answered" : `Slide ${q.slideNumber ?? "–"}`}
               </span>
             </li>

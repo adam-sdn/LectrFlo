@@ -14,7 +14,7 @@ export interface NotesHandle {
 }
 
 /** Private notes, autosaved to the server (the source of truth) shortly after typing stops. */
-export function NotesPanel({ lectureId, ref }: { lectureId: string; ref?: Ref<NotesHandle> }) {
+export function NotesPanel({ lectureId, ref, className = "" }: { lectureId: string; ref?: Ref<NotesHandle>; className?: string }) {
   const [content, setContent] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -116,21 +116,22 @@ export function NotesPanel({ lectureId, ref }: { lectureId: string; ref?: Ref<No
   }, []);
 
   const status = {
-    saved: <span className="text-emerald-700">Saved</span>,
-    dirty: <span className="text-slate-500">Unsaved changes…</span>,
+    saved: <span className="text-muted">✓ Saved</span>,
+    dirty: <span className="text-faint">Editing…</span>,
     saving: (
-      <span className="flex items-center gap-1.5 text-slate-500">
+      <span className="flex items-center gap-1.5 text-muted">
         <Spinner className="size-3" /> Saving…
       </span>
     ),
-    error: <span className="text-rose-700">Not saved</span>,
+    error: <span className="text-confused">Not saved</span>,
   }[saveState];
 
   return (
     <Card
+      className={className}
       title={
         <span className="flex items-center gap-2">
-          📝 My notes <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">Private</span>
+          Private notes <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] font-normal text-muted">Only you</span>
         </span>
       }
       action={loaded && <span className="text-xs" aria-live="polite">{status}</span>}
@@ -138,7 +139,7 @@ export function NotesPanel({ lectureId, ref }: { lectureId: string; ref?: Ref<No
       {loadError ? (
         <ErrorNotice message={`Couldn't load your notes: ${loadError}`} onRetry={load} />
       ) : !loaded ? (
-        <div className="flex h-40 items-center justify-center gap-2 text-sm text-slate-500">
+        <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted">
           <Spinner /> Loading notes…
         </div>
       ) : (
@@ -153,7 +154,7 @@ export function NotesPanel({ lectureId, ref }: { lectureId: string; ref?: Ref<No
             onBlur={() => void save()}
             placeholder="Type your notes here. They save automatically and only you can see them."
             maxLength={100000}
-            className="h-48 w-full resize-y rounded-xl border-0 p-3 text-sm leading-relaxed ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-600 focus:outline-none lg:h-56"
+            className="scrollbar-thin h-64 w-full resize-y rounded-xl border-0 bg-canvas/60 p-4 text-sm leading-relaxed text-fg ring-1 ring-line-strong transition placeholder:text-faint focus:ring-2 focus:ring-ai focus:outline-none lg:h-[26rem]"
           />
           {saveState === "error" && saveError && (
             <div className="mt-2">

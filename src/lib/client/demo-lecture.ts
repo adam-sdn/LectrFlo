@@ -114,42 +114,52 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
 }
 
 function drawTitleSlide(ctx: CanvasRenderingContext2D, slide: DemoSlide) {
-  ctx.fillStyle = "#312e81";
+  ctx.fillStyle = "#0b1020";
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#4f46e5";
-  ctx.fillRect(0, H - 24, W, 24);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `700 120px ${SANS}`;
-  ctx.fillText(slide.title, 120, 400);
-  ctx.fillStyle = "#c7d2fe";
-  ctx.font = `600 72px ${SANS}`;
-  ctx.fillText(slide.bullets[0], 120, 510);
-  ctx.fillStyle = "#e0e7ff";
+  const glow = ctx.createRadialGradient(W * 0.72, H * 0.3, 0, W * 0.72, H * 0.3, W * 0.6);
+  glow.addColorStop(0, "rgba(124, 92, 255, 0.35)");
+  glow.addColorStop(0.5, "rgba(54, 217, 255, 0.08)");
+  glow.addColorStop(1, "rgba(11, 16, 32, 0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+  const bar = ctx.createLinearGradient(0, 0, W, 0);
+  bar.addColorStop(0, "#7c5cff");
+  bar.addColorStop(1, "#36d9ff");
+  ctx.fillStyle = bar;
+  ctx.fillRect(120, 300, 120, 8);
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = `600 120px ${SANS}`;
+  ctx.fillText(slide.title, 120, 440);
+  ctx.fillStyle = "#9b87ff";
+  ctx.font = `500 72px ${SANS}`;
+  ctx.fillText(slide.bullets[0], 120, 550);
+  ctx.fillStyle = "#8b95a7";
   ctx.font = `400 40px ${SANS}`;
   ctx.fillText(slide.bullets[1], 120, 600);
 }
 
 function drawContentSlide(ctx: CanvasRenderingContext2D, slide: DemoSlide, index: number, total: number) {
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#0b1020";
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#4f46e5";
-  ctx.fillRect(0, 0, 16, H);
 
-  ctx.fillStyle = "#6366f1";
+  ctx.fillStyle = "#9b87ff";
   ctx.font = `600 28px ${SANS}`;
   ctx.fillText("MATH 101 · DIFFERENTIATION", 100, 100);
-  ctx.fillStyle = "#0f172a";
-  ctx.font = `700 72px ${SANS}`;
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = `600 72px ${SANS}`;
   ctx.fillText(slide.title, 100, 190);
 
   let y = 260;
   if (slide.formulas?.length) {
     const boxHeight = 60 + slide.formulas.length * 64;
-    ctx.fillStyle = "#eef2ff";
+    ctx.fillStyle = "#121829";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.roundRect(100, y, W - 200, boxHeight, 20);
     ctx.fill();
-    ctx.fillStyle = "#1e1b4b";
+    ctx.stroke();
+    ctx.fillStyle = "#e2e8f0";
     ctx.font = `500 52px ${SERIF}`;
     slide.formulas.forEach((formula, i) => ctx.fillText(formula, 150, y + 82 + i * 64));
     y += boxHeight + 70;
@@ -159,11 +169,11 @@ function drawContentSlide(ctx: CanvasRenderingContext2D, slide: DemoSlide, index
 
   ctx.font = `400 40px ${SANS}`;
   for (const bullet of slide.bullets) {
-    ctx.fillStyle = "#6366f1";
+    ctx.fillStyle = "#7c5cff";
     ctx.beginPath();
     ctx.arc(118, y - 13, 8, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#1e293b";
+    ctx.fillStyle = "#cbd3df";
     for (const line of wrap(ctx, bullet, W - 300)) {
       ctx.fillText(line, 150, y);
       y += 54;
@@ -171,7 +181,7 @@ function drawContentSlide(ctx: CanvasRenderingContext2D, slide: DemoSlide, index
     y += 22;
   }
 
-  ctx.fillStyle = "#94a3b8";
+  ctx.fillStyle = "#5b6476";
   ctx.font = `400 24px ${SANS}`;
   ctx.fillText(`${index + 1} / ${total}`, W - 160, H - 50);
 }

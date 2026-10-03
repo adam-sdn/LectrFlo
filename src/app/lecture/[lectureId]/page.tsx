@@ -7,7 +7,7 @@ import { SlideViewer } from "@/components/slide-viewer";
 import { AiChat } from "@/components/student/ai-chat";
 import { AskLecturer, ConfusedButton } from "@/components/student/interaction-panels";
 import { NotesPanel, type NotesHandle } from "@/components/student/notes-panel";
-import { AppHeader, Card, ConnectionDot, ErrorNotice, LoadingScreen, StatusBadge } from "@/components/ui";
+import { AppHeader, Button, Card, ConnectionDot, ErrorNotice, LoadingScreen, StatusBadge, splitTitle } from "@/components/ui";
 import { useCoalescedRefresh, useInterval, useRealtimeChannel } from "@/lib/client/hooks";
 import { ClientApiError, errorMessage } from "@/lib/client/http";
 import { createSlideUrlCache } from "@/lib/client/slide-url-cache";
@@ -20,6 +20,7 @@ export default function StudentLecturePage() {
   const [state, setState] = useState<StudentLectureState | null>(null);
   const [error, setError] = useState<{ text: string; notJoined: boolean } | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [tab, setTab] = useState<"ai" | "notes">("ai");
   const [urlCache] = useState(createSlideUrlCache);
   const loadVersion = useRef(0);
   const notesRef = useRef<NotesHandle>(null);
@@ -84,7 +85,7 @@ export default function StudentLecturePage() {
           <main className="mx-auto max-w-xl space-y-4 px-4 py-16">
             <ErrorNotice message={error.text} onRetry={error.notJoined ? undefined : load} />
             {error.notJoined && (
-              <Link href="/join" className="inline-block text-sm font-semibold text-indigo-600">
+              <Link href="/join" className="inline-block text-sm font-medium text-ai-bright hover:text-fg">
                 Join with a code →
               </Link>
             )}
@@ -100,23 +101,39 @@ export default function StudentLecturePage() {
   const live = lecture.status === "live";
   const ended = lecture.status === "ended";
   const slide = state.slides.find((s) => s.slideNumber === lecture.currentSlide);
+  const { course, topic } = splitTitle(lecture.title);
+  const context = [lecture.module, lecture.lecturerName].filter(Boolean).join(" · ");
 
   return (
     <>
-      <AppHeader role="Student">
+      <AppHeader
+        role="Student"
+        title={
+          <>
+            <p className="min-w-0 truncate text-sm">
+              <span className="font-medium text-fg">{course}</span>
+              {topic && <span className="text-muted"> · {topic}</span>}
+            </p>
+            <StatusBadge status={lecture.status} />
+          </>
+        }
+      >
         {!ended && <ConnectionDot status={connection} />}
-        <span className="text-sm text-slate-600">
-          Joined as <span className="font-semibold text-slate-900">{state.participant.displayName}</span>
+        <span className="min-w-0 truncate text-sm text-muted">
+          <span className="hidden sm:inline">Joined as </span>
+          <span className="font-medium text-fg">{state.participant.displayName}</span>
         </span>
       </AppHeader>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <main className="mx-auto max-w-[1440px] px-3 py-4 sm:px-6 sm:py-6">
+        {/* Lecture context on small screens (the header shows it from md up). */}
+        <div className="mb-4 flex items-start justify-between gap-3 px-1 md:hidden">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-indigo-600">
-              {[lecture.module, lecture.lecturerName].filter(Boolean).join(" · ") || "Lecture"}
-            </p>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{lecture.title}</h1>
+            {context && <p className="truncate text-xs text-muted">{context}</p>}
+            <h1 className="text-lg leading-tight font-semibold tracking-tight">
+              {course}
+              {topic && <span className="text-muted"> · {topic}</span>}
+            </h1>
           </div>
           <StatusBadge status={lecture.status} />
         </div>
@@ -128,29 +145,32 @@ export default function StudentLecturePage() {
         )}
 
         {ended && (
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-900 px-5 py-4 text-white">
+          <div className="mb-4 flex animate-fade-up flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-5 py-4">
             <div>
-              <p className="font-semibold">This lecture has ended.</p>
-              <p className="text-sm text-slate-300">Your notes are saved. You can keep asking Lecture AI to review.</p>
+              <p className="font-medium text-fg">This lecture has ended.</p>
+              <p className="text-sm text-muted">Your notes are saved. You can keep asking Lecture AI to review.</p>
             </div>
-            <button
-              type="button"
-              onClick={downloadNotes}
-              disabled={downloading}
-              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-70"
-            >
+            <Button variant="secondary" onClick={downloadNotes} disabled={downloading}>
               {downloading ? "Saving notes…" : "Download my notes"}
-            </button>
+            </Button>
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-12">
-          <div className="space-y-4 lg:col-span-7">
+        {/* Mobile order: slide, confused, AI/notes, ask, objectives. Desktop: slide column + sticky side panel. */}
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_26rem] lg:grid-rows-[auto_auto_1fr] lg:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28rem]">
+          <div className="order-1 lg:col-span-2 lg:col-start-1 lg:row-start-1">
             {lecture.status === "lobby" || lecture.status === "draft" ? (
-              <div className="flex aspect-video flex-col items-center justify-center rounded-2xl bg-indigo-950 p-8 text-center text-white">
-                <p className="text-sm font-semibold uppercase tracking-wide text-indigo-300">You&apos;re in</p>
-                <p className="mt-2 text-2xl font-bold">Waiting for the lecturer to start…</p>
-                <p className="mt-2 text-sm text-indigo-200">The first slide will appear here automatically.</p>
+              <div className="relative flex aspect-video flex-col items-center justify-center overflow-hidden rounded-2xl border border-line bg-surface p-8 text-center">
+                <div className="pointer-events-none absolute inset-0" aria-hidden>
+                  <div className="ambient-glow animate-ambient" />
+                </div>
+                <span className="relative flex size-12 items-center justify-center" aria-hidden>
+                  <span className="absolute inset-0 animate-ping rounded-full bg-ai/20 [animation-duration:2.4s]" />
+                  <span className="size-3 rounded-full bg-ai-bright" />
+                </span>
+                <p className="relative mt-5 text-xs font-medium tracking-[0.16em] text-ai-bright uppercase">You&apos;re in</p>
+                <p className="relative mt-2 text-xl font-semibold tracking-tight text-fg sm:text-2xl">Waiting for the lecture to start…</p>
+                <p className="relative mt-2 text-sm text-muted">The first slide will appear here automatically.</p>
               </div>
             ) : (
               <SlideViewer
@@ -160,36 +180,83 @@ export default function StudentLecturePage() {
                 onImageError={onImageError}
               />
             )}
-
-            {!ended && (
-              <div className="grid gap-4 xl:grid-cols-2">
-                <ConfusedButton lectureId={lectureId} live={live} currentSlide={lecture.currentSlide} />
-                <AskLecturer lectureId={lectureId} live={live} />
-              </div>
-            )}
-
-            {objectives.length > 0 && (
-              <Card title="🎯 Learning objectives">
-                <ol className="space-y-2">
-                  {objectives.map((o, i) => (
-                    <li key={o.id} className="flex gap-3 text-sm text-slate-700">
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700">
-                        {i + 1}
-                      </span>
-                      {o.text}
-                    </li>
-                  ))}
-                </ol>
-              </Card>
-            )}
           </div>
 
-          <div className="space-y-4 lg:col-span-5">
-            <AiChat lectureId={lectureId} />
-            <NotesPanel lectureId={lectureId} ref={notesRef} />
+          {!ended && (
+            <>
+              <div className="order-2 lg:col-start-1 lg:row-start-2 lg:[&>*]:h-full">
+                <ConfusedButton lectureId={lectureId} live={live} currentSlide={lecture.currentSlide} />
+              </div>
+              <div className="order-4 lg:col-start-2 lg:row-start-2 lg:[&>*]:h-full">
+                <AskLecturer lectureId={lectureId} live={live} />
+              </div>
+            </>
+          )}
+
+          {objectives.length > 0 && (
+            <Card title="Learning objectives" className="order-5 lg:col-span-2 lg:col-start-1 lg:row-start-3 lg:self-start">
+              <ol className="space-y-2.5">
+                {objectives.map((o, i) => (
+                  <li key={o.id} className="flex gap-3 text-sm text-fg-2">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-xs text-muted">
+                      {i + 1}
+                    </span>
+                    <span className="pt-0.5">{o.text}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          )}
+
+          <div className="order-3 lg:sticky lg:top-20 lg:col-start-3 lg:row-span-3 lg:row-start-1 lg:self-start">
+            <div role="tablist" aria-label="Study tools" className="mb-3 grid grid-cols-2 gap-1 rounded-xl border border-line bg-surface p-1">
+              <TabButton active={tab === "ai"} onClick={() => setTab("ai")} controls="panel-ai" activeClass="bg-ai/15 text-fg ring-1 ring-inset ring-ai/30">
+                <span className="text-ai-bright" aria-hidden>
+                  ✦
+                </span>
+                Lecture AI
+              </TabButton>
+              <TabButton active={tab === "notes"} onClick={() => setTab("notes")} controls="panel-notes" activeClass="bg-surface-3 text-fg ring-1 ring-inset ring-line-strong">
+                Private notes
+              </TabButton>
+            </div>
+            {/* Both panels stay mounted so chat state and pending note saves survive tab switches. */}
+            <div id="panel-ai" role="tabpanel" hidden={tab !== "ai"} className="animate-fade-in">
+              <AiChat lectureId={lectureId} className="h-[32rem] lg:h-[calc(100dvh-10.5rem)] lg:min-h-[28rem]" />
+            </div>
+            <div id="panel-notes" role="tabpanel" hidden={tab !== "notes"} className="animate-fade-in">
+              <NotesPanel lectureId={lectureId} ref={notesRef} />
+            </div>
           </div>
         </div>
       </main>
     </>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  controls,
+  activeClass,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  controls: string;
+  activeClass: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      aria-controls={controls}
+      onClick={onClick}
+      className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition duration-200 focus-visible:outline-2 focus-visible:outline-ai-bright ${active ? activeClass : "text-muted hover:text-fg"}`}
+    >
+      {children}
+    </button>
   );
 }

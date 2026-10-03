@@ -12,7 +12,7 @@ type ChatMessage = AiMessage & { local?: "sending" };
 const SUGGESTIONS = ["Explain this slide more simply", "Give me a worked example", "Why does this rule work?"];
 
 /** Private, lecture-aware AI tutor chat backed by POST /api/student/lectures/:id/ai. */
-export function AiChat({ lectureId }: { lectureId: string }) {
+export function AiChat({ lectureId, className = "h-[30rem] lg:h-[36rem]" }: { lectureId: string; className?: string }) {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [input, setInput] = useState("");
@@ -104,40 +104,52 @@ export function AiChat({ lectureId }: { lectureId: string }) {
   }
 
   return (
-    <section className="flex h-[30rem] flex-col rounded-2xl bg-white shadow-sm ring-1 ring-indigo-200 lg:h-[36rem]">
-      <header className="flex items-start justify-between gap-3 rounded-t-2xl border-b border-indigo-100 bg-indigo-50 px-5 py-3">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">🤖 Lecture AI</h2>
-          <p className="text-xs text-slate-600">Answers using this lecture&apos;s slides and objectives.</p>
+    <section className={`flex flex-col overflow-hidden rounded-2xl border border-ai/20 bg-surface ${className}`}>
+      <header className="relative flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-ai-bright/50 to-transparent" aria-hidden />
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-ai/15 text-sm text-ai-bright ring-1 ring-inset ring-ai/30" aria-hidden>
+            ✦
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-medium text-fg">Lecture AI</h2>
+            <p className="truncate text-xs text-muted">Answers grounded in this lecture&apos;s slides</p>
+          </div>
         </div>
-        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
-          🔒 Private to you
-        </span>
+        <span className="shrink-0 rounded-md border border-line px-2 py-0.5 text-[11px] text-muted">Private to you</span>
       </header>
 
       <div
         ref={listRef}
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4"
+        className="scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5"
         aria-live="polite"
         aria-label="Lecture AI conversation"
       >
         {loadError && <ErrorNotice message={`Couldn't load your chat: ${loadError}`} onRetry={load} />}
         {!messages && !loadError && (
-          <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="flex items-center gap-2 text-sm text-muted">
             <Spinner /> Loading chat…
           </div>
         )}
         {messages?.length === 0 && !unavailable && (
-          <div className="space-y-3 text-sm text-slate-600">
-            <p>Stuck on something? Ask Lecture AI. Your lecturer and classmates can&apos;t see this chat.</p>
-            <div className="flex flex-wrap gap-2">
+          <div className="flex h-full animate-fade-in flex-col justify-end gap-4">
+            <div>
+              <p className="text-base font-medium text-fg">Stuck on something?</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted">
+                Ask about anything in this lecture. Your lecturer and classmates can&apos;t see this chat.
+              </p>
+            </div>
+            <div className="flex flex-col items-start gap-2">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
                   type="button"
                   onClick={() => void ask(s)}
-                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-indigo-600"
+                  className="rounded-xl border border-line bg-surface-2 px-3 py-2 text-left text-sm text-fg-2 transition hover:border-ai/40 hover:bg-ai/[0.08] hover:text-fg focus-visible:outline-2 focus-visible:outline-ai-bright"
                 >
+                  <span className="mr-2 text-ai-bright" aria-hidden>
+                    ✦
+                  </span>
                   {s}
                 </button>
               ))}
@@ -145,32 +157,44 @@ export function AiChat({ lectureId }: { lectureId: string }) {
           </div>
         )}
         {messages?.map((m) => (
-          <div key={m.id} className={m.role === "student" ? "flex justify-end" : "flex justify-start"}>
+          <div key={m.id} className={`flex animate-fade-up ${m.role === "student" ? "justify-end" : "justify-start"}`}>
             <div
               className={
                 m.role === "student"
-                  ? `max-w-[85%] rounded-2xl rounded-br-sm px-3.5 py-2 text-sm ${m.status === "failed" ? "bg-rose-50 text-rose-950 ring-1 ring-rose-200" : "bg-indigo-600 text-white"}`
-                  : "max-w-[90%] rounded-2xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-sm text-slate-800"
+                  ? `max-w-[85%] rounded-2xl rounded-br-md px-3.5 py-2.5 text-sm leading-relaxed ${m.status === "failed" ? "bg-confused/[0.08] text-[#fecdd3] ring-1 ring-inset ring-confused/25" : "bg-surface-3 text-fg"}`
+                  : "max-w-[92%] rounded-2xl rounded-bl-md border border-ai/20 bg-ai/[0.07] px-4 py-3 text-sm text-fg-2"
               }
             >
+              {m.role === "assistant" && (
+                <p className="mb-1.5 text-[11px] font-medium text-ai-bright">
+                  <span aria-hidden>✦ </span>Lecture AI
+                </p>
+              )}
               {m.role === "assistant" ? <FormattedText text={m.content} /> : <p className="whitespace-pre-wrap">{m.content}</p>}
-              {m.status === "failed" && <p className="mt-1 text-xs font-medium text-rose-800">Not answered — try again</p>}
+              {m.status === "failed" && <p className="mt-1 text-xs text-confused">Not answered — try again</p>}
               {m.status === "pending" && !m.local && m === last && (
-                <p className="mt-1 text-xs text-indigo-100">{gaveUpWaiting ? "No answer yet — ask again" : "Waiting for answer…"}</p>
+                <p className="mt-1 text-xs text-muted">{gaveUpWaiting ? "No answer yet — ask again" : "Waiting for answer…"}</p>
               )}
             </div>
           </div>
         ))}
-        {sending && (
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Spinner className="size-3" /> Lecture AI is thinking…
+        {(sending || (waitingForReply && !gaveUpWaiting)) && (
+          <div className="flex animate-fade-up justify-start" role="status" aria-label="Lecture AI is thinking">
+            <div className="flex items-center gap-3 rounded-2xl rounded-bl-md border border-ai/20 bg-ai/[0.07] px-4 py-3">
+              <span className="flex gap-1" aria-hidden>
+                {[0, 150, 300].map((d) => (
+                  <span key={d} className="size-1.5 animate-typing rounded-full bg-ai-bright" style={{ animationDelay: `${d}ms` }} />
+                ))}
+              </span>
+              <span className="text-xs text-muted">Reading the lecture…</span>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="border-t border-slate-100 px-5 py-3">
+      <div className="border-t border-line p-3">
         {unavailable && (
-          <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
+          <p className="mb-2 rounded-xl bg-white/[0.04] px-3 py-2 text-xs text-muted ring-1 ring-inset ring-line">
             Lecture AI isn&apos;t available right now (no AI provider is configured). Your notes still work.
           </p>
         )}
@@ -179,7 +203,10 @@ export function AiChat({ lectureId }: { lectureId: string }) {
             <ErrorNotice message={error.text} onRetry={error.retry ? () => void ask(error.retry!) : undefined} />
           </div>
         )}
-        <form onSubmit={submit} className="flex gap-2">
+        <form
+          onSubmit={submit}
+          className="flex items-center gap-2 rounded-xl bg-canvas/60 p-1.5 ring-1 ring-line-strong transition focus-within:ring-2 focus-within:ring-ai"
+        >
           <label htmlFor="ai-input" className="sr-only">
             Ask Lecture AI
           </label>
@@ -189,11 +216,11 @@ export function AiChat({ lectureId }: { lectureId: string }) {
             onChange={(e) => setInput(e.target.value)}
             maxLength={2000}
             disabled={unavailable}
-            placeholder="Ask Lecture AI about this lecture…"
-            className="min-w-0 flex-1 rounded-lg border-0 px-3 py-2 text-sm ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50"
+            placeholder="Ask about this lecture…"
+            className="min-w-0 flex-1 bg-transparent px-2.5 py-1.5 text-sm text-fg placeholder:text-faint focus:outline-none disabled:opacity-60"
           />
-          <Button type="submit" disabled={sending || unavailable || !input.trim()}>
-            Ask
+          <Button type="submit" disabled={sending || unavailable || !input.trim()} className="px-3.5 py-1.5" aria-label="Ask Lecture AI">
+            Ask <span aria-hidden>↑</span>
           </Button>
         </form>
       </div>
@@ -239,6 +266,6 @@ function FormattedText({ text }: { text: string }) {
 
 function inline(text: string): ReactNode {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.startsWith("**") && part.endsWith("**") ? <strong key={i}>{part.slice(2, -2)}</strong> : <Fragment key={i}>{part}</Fragment>,
+    part.startsWith("**") && part.endsWith("**") ? <strong key={i} className="font-medium text-fg">{part.slice(2, -2)}</strong> : <Fragment key={i}>{part}</Fragment>,
   );
 }
