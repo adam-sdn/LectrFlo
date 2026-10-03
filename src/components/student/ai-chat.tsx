@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, typ
 import { Button, ErrorNotice, Spinner } from "@/components/ui";
 import { useInterval } from "@/lib/client/hooks";
 import { ClientApiError, errorMessage } from "@/lib/client/http";
+import { plainMath } from "@/lib/client/plain-math";
 import { studentApi } from "@/lib/client/student-api";
 import type { AiMessage } from "@/lib/types";
 
@@ -153,7 +154,11 @@ export function AiChat({ lectureId }: { lectureId: string }) {
                   : "max-w-[90%] rounded-2xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-sm text-slate-800"
               }
             >
-              {m.role === "assistant" ? <FormattedText text={m.content} /> : <p className="whitespace-pre-wrap">{m.content}</p>}
+              {m.role === "assistant" ? (
+                <FormattedText text={plainMath(m.content)} />
+              ) : (
+                <p className="whitespace-pre-wrap">{m.content}</p>
+              )}
               {m.status === "failed" && <p className="mt-1 text-xs font-medium text-rose-800">Not answered — try again</p>}
               {m.status === "pending" && !m.local && m === last && (
                 <p className="mt-1 text-xs text-indigo-100">{gaveUpWaiting ? "No answer yet — ask again" : "Waiting for answer…"}</p>

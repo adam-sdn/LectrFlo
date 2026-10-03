@@ -20,46 +20,66 @@ export interface AiProvider {
 export class AiProviderError extends Error {}
 
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
-export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+// Gemma 4 (served by the Gemini API). The 26B MoE model answers in seconds; the dense
+// 31B model was too slow for live tutoring in testing.
+export const DEFAULT_GEMINI_MODEL = "gemma-4-26b-a4b-it";
+// Minimal thinking keeps Gemma 4 fast (a recap took ~12 s instead of ~55 s) and its JSON valid.
+const DEFAULT_THINKING_LEVEL = "minimal";
 const RETRYABLE_STATUSES = [429, 500, 503];
-// Two attempts plus the retry pause must fit within the routes' 60 s maxDuration (Vercel).
-const ATTEMPT_TIMEOUT_MS = 25_000;
+// Budget for all attempts of one request; must fit the AI routes' 60 s maxDuration (Vercel).
+const DEADLINE_MS = 55_000;
+const MIN_RETRY_MS = 10_000;
 
-function geminiProvider(apiKey: string, model: string, baseUrl: string): AiProvider {
-  async function call(body: string): Promise<Response> {
-    return fetch(`${baseUrl}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body,
-      signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
-    });
-  }
+// Models that rejected thinkingConfig; later requests skip it.
+const thinkingUnsupported = new Set<string>();
 
+function geminiProvider(apiKey: string, model: string, baseUrl: string, thinkingLevel: string | null): AiProvider {
   return {
     model,
     async generate(req) {
-      const body = JSON.stringify({
-        systemInstruction: { parts: [{ text: req.system }] },
-        contents: [
-          ...(req.history ?? []).map((h) => ({ role: h.role, parts: [{ text: h.text }] })),
-          {
-            role: "user",
-            parts: req.parts.map((p) =>
-              "text" in p ? { text: p.text } : { inlineData: { mimeType: p.image.mimeType, data: p.image.data } },
-            ),
+      const deadline = Date.now() + DEADLINE_MS;
+      const body = (withThinking: boolean) =>
+        JSON.stringify({
+          systemInstruction: { parts: [{ text: req.system }] },
+          contents: [
+            ...(req.history ?? []).map((h) => ({ role: h.role, parts: [{ text: h.text }] })),
+            {
+              role: "user",
+              parts: req.parts.map((p) =>
+                "text" in p ? { text: p.text } : { inlineData: { mimeType: p.image.mimeType, data: p.image.data } },
+              ),
+            },
+          ],
+          generationConfig: {
+            // Thinking tokens count towards this limit, so keep it generous.
+            maxOutputTokens: req.maxOutputTokens ?? 8192,
+            ...(req.json ? { responseMimeType: "application/json" } : {}),
+            ...(withThinking ? { thinkingConfig: { thinkingLevel } } : {}),
           },
-        ],
-        generationConfig: {
-          // Thinking models spend output tokens on reasoning, so keep this generous.
-          maxOutputTokens: req.maxOutputTokens ?? 8192,
-          ...(req.json ? { responseMimeType: "application/json" } : {}),
-        },
-      });
+        });
+      const call = async (withThinking: boolean) => {
+        try {
+          return await fetch(`${baseUrl}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            body: body(withThinking),
+            signal: AbortSignal.timeout(Math.max(1000, deadline - Date.now())),
+          });
+        } catch (err) {
+          throw new AiProviderError(`Gemini request failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      };
 
-      let res = await call(body);
-      if (RETRYABLE_STATUSES.includes(res.status)) {
+      let withThinking = Boolean(thinkingLevel) && !thinkingUnsupported.has(model);
+      let res = await call(withThinking);
+      if (res.status === 400 && withThinking && /thinking/i.test(await res.clone().text())) {
+        thinkingUnsupported.add(model);
+        withThinking = false;
+        res = await call(false);
+      }
+      if (RETRYABLE_STATUSES.includes(res.status) && deadline - Date.now() > MIN_RETRY_MS) {
         await new Promise((resolve) => setTimeout(resolve, 1500));
-        res = await call(body);
+        res = await call(withThinking);
       }
       if (!res.ok) {
         throw new AiProviderError(`Gemini request failed (${res.status}): ${(await res.text()).slice(0, 500)}`);
@@ -82,10 +102,12 @@ function geminiProvider(apiKey: string, model: string, baseUrl: string): AiProvi
 export function getAiProvider(): AiProvider | null {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
+  const level = process.env.GEMINI_THINKING_LEVEL;
   return geminiProvider(
     key,
     process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
     process.env.GEMINI_API_BASE_URL || GEMINI_BASE_URL,
+    level === undefined ? DEFAULT_THINKING_LEVEL : level && level !== "off" ? level : null,
   );
 }
 

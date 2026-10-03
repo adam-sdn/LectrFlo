@@ -23,6 +23,11 @@ describe("parseModelJson", () => {
     expect(parseModelJson('```json\n{"objectives":["A"]}\n```', objectivesOutput).objectives).toEqual(["A"]);
   });
 
+  it("unwraps an object wrapped in a one-element array", () => {
+    expect(parseModelJson('[{"objectives":["A"]}]', objectivesOutput).objectives).toEqual(["A"]);
+    expect(() => parseModelJson('[{"objectives":["A"]},{"objectives":["B"]}]', objectivesOutput)).toThrow();
+  });
+
   it("rejects output that does not match the schema", () => {
     expect(() => parseModelJson('{"objectives":[]}', objectivesOutput)).toThrow();
     expect(() => parseModelJson("not json", objectivesOutput)).toThrow();

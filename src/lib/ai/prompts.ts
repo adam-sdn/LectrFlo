@@ -29,6 +29,7 @@ export function tutorSystemPrompt(ctx: LectureContext, currentSlide: number | nu
     "Answer using the lecture context below. If the question goes beyond the lecture, say so briefly and still help.",
     "Be concise and clear: short paragraphs, examples where they help, no more than about 250 words unless asked.",
     "Never claim to know what other students asked or did.",
+    "Write maths as plain text with Unicode symbols, e.g. x², √x, h → 0, (f(x + h) − f(x)) / h. Never use LaTeX or $ delimiters.",
     currentSlide ? `The student is currently on slide ${currentSlide}; its image is attached when available.` : "",
     "",
     describeLecture(ctx),
@@ -139,5 +140,10 @@ export function parseModelJson<T extends z.ZodType>(text: string, schema: T): z.
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "");
-  return schema.parse(JSON.parse(unfenced));
+  const parsed: unknown = JSON.parse(unfenced);
+  const direct = schema.safeParse(parsed);
+  if (direct.success) return direct.data;
+  // Some models (e.g. Gemma) wrap the requested object in a one-element array.
+  if (Array.isArray(parsed) && parsed.length === 1) return schema.parse(parsed[0]);
+  throw direct.error;
 }

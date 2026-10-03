@@ -46,6 +46,11 @@ createServer((req, res) => {
     }
     const body = JSON.parse(raw);
     requests.push({ url: req.url, body });
+    // MOCK_REJECT_THINKING=1 imitates models that don't accept thinkingConfig.
+    if (process.env.MOCK_REJECT_THINKING && body.generationConfig?.thinkingConfig) {
+      res.writeHead(400, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ error: { code: 400, message: "Thinking level is not supported for this model.", status: "INVALID_ARGUMENT" } }));
+    }
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ candidates: [{ content: { role: "model", parts: [{ text: reply(body) }] } }] }));
   });
