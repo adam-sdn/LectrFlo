@@ -11,6 +11,8 @@ const AUTOSAVE_MS = 800;
 export interface NotesHandle {
   /** Saves any pending edits and resolves once the server has them (or the save failed). */
   flush: () => Promise<void>;
+  /** Appends a line (e.g. dictated through the voice tutor) and saves it. */
+  append: (text: string) => Promise<void>;
 }
 
 /** Private notes, autosaved to the server (the source of truth) shortly after typing stops. */
@@ -71,7 +73,20 @@ export function NotesPanel({ lectureId, ref }: { lectureId: string; ref?: Ref<No
     return run;
   }, [lectureId]);
 
-  useImperativeHandle(ref, () => ({ flush: save }), [save]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      flush: save,
+      append: (text: string) => {
+        const next = latest.current.trim() ? `${latest.current.trimEnd()}\n${text}` : text;
+        latest.current = next;
+        setContent(next);
+        setSaveState("dirty");
+        return save();
+      },
+    }),
+    [save],
+  );
 
   // Pick up edits made in another tab, but never over unsaved local text.
   useEffect(() => {

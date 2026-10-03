@@ -1,6 +1,7 @@
 // End-to-end API smoke test against a running app + Supabase (e.g. `supabase start` + `npm run dev`).
 // Usage: APP_URL=http://localhost:3000 NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
-//        SUPABASE_SERVICE_ROLE_KEY=... [EXPECT_AI=unavailable|failing] [MOCK_GEMINI_URL=...] node scripts/smoke-test.mjs
+//        SUPABASE_SERVICE_ROLE_KEY=... [EXPECT_AI=unavailable|failing] [MOCK_GEMINI_URL=...] \
+//        [EXPECT_VOICE=available] node scripts/smoke-test.mjs
 // Creates throwaway lecturer accounts and a lecture, then deletes the lecture.
 
 import { createClient } from "@supabase/supabase-js";
@@ -208,6 +209,24 @@ async function main() {
       check("AI context: current slide image attached", first?.contents.at(-1).parts.some((p) => p.inlineData?.mimeType === "image/png"));
       check("AI context: follow-up includes history", tutor[1]?.body.contents.length === 3 && tutor[1].body.contents[0].role === "user" && tutor[1].body.contents[1].role === "model");
     }
+  }
+
+  console.log("Voice tutor");
+  const voiceSlide = await api(`/api/student/lectures/${id}/voice`, { cookie: cookieA });
+  check("voice: current slide for the agent tool", voiceSlide.status === 200 && voiceSlide.data.summary.includes("slide 2 of 3") && voiceSlide.data.summary.includes("Breadth-first"), voiceSlide.data);
+  check("voice: requires join", (await api(`/api/student/lectures/${id}/voice`, { method: "POST" })).status === 401);
+  const voice = await api(`/api/student/lectures/${id}/voice`, { method: "POST", cookie: cookieA });
+  if (process.env.EXPECT_VOICE === "available") {
+    const vars = voice.data.dynamicVariables ?? {};
+    check("voice: signed session URL", voice.status === 200 && voice.data.signedUrl?.startsWith("wss://"), voice.data);
+    check(
+      "voice: student-specific lecture context",
+      vars.student_name === "Samantha" && vars.lecture_title === "Graph Algorithms" && vars.current_slide === "2" && vars.confused_slides === "2" && vars.slide_text.includes("Breadth-first"),
+      vars,
+    );
+    check("voice: API key never returned", !JSON.stringify(voice.data).includes("test-eleven-key"));
+  } else {
+    check("voice: unavailable without ElevenLabs config", voice.status === 503 && voice.data.error.code === "voice_unavailable", voice.data);
   }
 
   const lecturerView = await api(`/api/lectures/${id}`, { token: lecturer });

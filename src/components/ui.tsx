@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 import type { ConnectionStatus } from "@/lib/realtime-client";
 import type { LectureStatus } from "@/lib/types";
 
@@ -16,7 +16,7 @@ export function Button({
   variant = "primary",
   className = "",
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
+}: ComponentPropsWithRef<"button"> & { variant?: Variant }) {
   return (
     <button
       type="button"

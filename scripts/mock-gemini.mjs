@@ -1,4 +1,5 @@
-// Minimal stand-in for the Gemini generateContent API, for scripts/smoke-test.mjs.
+// Minimal stand-in for the Gemini generateContent API (and ElevenLabs' signed-URL endpoint),
+// for scripts/smoke-test.mjs.
 // Usage: node scripts/mock-gemini.mjs [port]   then set GEMINI_API_BASE_URL=http://localhost:<port>
 // Answers by recognising the system prompt. GET /requests returns the received request bodies.
 
@@ -33,6 +34,16 @@ function reply(body) {
 }
 
 createServer((req, res) => {
+  // ElevenLabs signed-URL endpoint (set ELEVENLABS_API_BASE_URL to this server).
+  if (req.method === "GET" && req.url?.startsWith("/v1/convai/conversation/get-signed-url")) {
+    const agentId = new URL(req.url, "http://localhost").searchParams.get("agent_id");
+    if (!req.headers["xi-api-key"] || !agentId) {
+      res.writeHead(401, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ detail: "missing api key or agent id" }));
+    }
+    res.writeHead(200, { "content-type": "application/json" });
+    return res.end(JSON.stringify({ signed_url: `wss://127.0.0.1:9/v1/convai/conversation?agent_id=${agentId}&token=mock` }));
+  }
   if (req.method === "GET" && req.url === "/requests") {
     res.writeHead(200, { "content-type": "application/json" });
     return res.end(JSON.stringify(requests));
