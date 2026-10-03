@@ -91,7 +91,7 @@ export default function LecturerHome() {
             <Link
               key={lecture.id}
               href={`/lecturer/${lecture.id}`}
-              className="flex items-center justify-between gap-4 rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-slate-200 transition hover:ring-indigo-400 focus-visible:outline-2 focus-visible:outline-indigo-600"
+              className="flex items-center justify-between gap-4 rounded-2xl bg-white px-5 py-4 ring-1 ring-slate-200 transition hover:ring-indigo-400 focus-visible:outline-2 focus-visible:outline-indigo-600"
             >
               <div className="min-w-0">
                 <p className="truncate font-semibold">{lecture.title}</p>

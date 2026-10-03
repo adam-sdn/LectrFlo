@@ -69,7 +69,7 @@ function JoinForm() {
   }
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-5 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 sm:p-8">
+    <form onSubmit={submit} noValidate className="space-y-5 rounded-2xl bg-white p-6 ring-1 ring-slate-200 sm:p-8">
       <div>
         <label htmlFor="code" className="block text-sm font-semibold text-slate-900">
           Lecture code
