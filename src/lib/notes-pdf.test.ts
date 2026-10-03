@@ -16,6 +16,7 @@ const input = (extra: Partial<NotesExportInput> = {}): NotesExportInput => ({
   annotations: [],
   questions: [],
   aiMessages: [],
+  timeZone: "UTC",
   ...extra,
 });
 
@@ -49,9 +50,24 @@ describe("renderNotesPdf", () => {
     // Fonts are subset, so the file stays small.
     expect(bytes.length).toBeLessThan(400_000);
   });
+
+  it("stays fast for pathological notes (one huge word, zero-width and combining characters)", async () => {
+    const started = performance.now();
+    const notes = ["x".repeat(100_000), "\u200b".repeat(30_000), `e${"\u0301".repeat(30_000)}`].join("\n");
+    const bytes = await renderNotesPdf(buildNotesExport(input({ notes })));
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(10);
+    expect(performance.now() - started).toBeLessThan(10_000);
+  }, 30_000);
 });
 
 describe("wrap", () => {
+  const dejaVu = async () => {
+    const doc = await PDFDocument.create();
+    doc.registerFontkit(fontkit);
+    return doc.embedFont(await readFile("assets/fonts/DejaVuSans.ttf"), { subset: true });
+  };
+  const texts = (lines: { segments: { text: string }[] }[]) => lines.map((l) => l.segments.map((s) => s.text).join(""));
+
   it("wraps on spaces, keeps fonts apart and splits words longer than a line", async () => {
     const doc = await PDFDocument.create();
     const regular = await doc.embedFont(StandardFonts.Helvetica);
@@ -76,11 +92,21 @@ describe("wrap", () => {
   });
 
   it("drops emoji the font can't draw but keeps symbols it can", async () => {
-    const doc = await PDFDocument.create();
-    doc.registerFontkit(fontkit);
-    const font = await doc.embedFont(await readFile("assets/fonts/DejaVuSans.ttf"), { subset: true });
-    const lines = wrap([{ text: "done 🎉✓ x² → 中\ttab", font, color: rgb(0, 0, 0) }], 10, 400);
-    expect(lines.map((l) => l.segments.map((s) => s.text).join(""))).toEqual(["done ✓ x² → 中 tab"]);
+    const lines = wrap([{ text: "done 🎉✓ x² → 中\ttab", font: await dejaVu(), color: rgb(0, 0, 0) }], 10, 400);
+    expect(texts(lines)).toEqual(["done ✓ x² → 中 tab"]);
+  });
+
+  it("measures what is drawn: NEL and other C1 controls never reach pdf-lib", async () => {
+    const lines = wrap([{ text: "a\u0085".repeat(60) + "b\u0090c", font: await dejaVu(), color: rgb(0, 0, 0) }], 10.5, 200);
+    expect(texts(lines).join(" ")).not.toMatch(/[\u0080-\u009f]/);
+    for (const line of lines) expect(line.width).toBeLessThanOrEqual(200);
+  });
+
+  it("splits a very long word into lines that fit, keeping every character", async () => {
+    const word = "ab".repeat(20_000);
+    const lines = wrap([{ text: word, font: await dejaVu(), color: rgb(0, 0, 0) }], 10.5, 483);
+    expect(texts(lines).join("")).toBe(word);
+    for (const line of lines) expect(line.width).toBeLessThanOrEqual(483);
   });
 
   it("puts a word that is wider than the line on a line of its own", async () => {

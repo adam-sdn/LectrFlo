@@ -25,7 +25,8 @@ export const studentApi = {
   aiHistory: (id: string) => apiRequest<{ messages: AiMessage[] }>(`/api/student/lectures/${id}/ai`),
   askAi: (id: string, message: string) =>
     apiRequest<{ messages: AiMessage[] }>(`/api/student/lectures/${id}/ai`, { method: "POST", body: { message } }),
-  exportUrl: (id: string) => `/api/student/lectures/${id}/export`,
+  exportUrl: (id: string) =>
+    `/api/student/lectures/${id}/export?tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`,
   voiceSession: (id: string) =>
     apiRequest<{ signedUrl: string; dynamicVariables: Record<string, string> }>(`/api/student/lectures/${id}/voice`, {
       method: "POST",

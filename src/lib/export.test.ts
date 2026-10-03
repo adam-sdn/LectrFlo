@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildNotesExport, pairAiMessages, parseRichText, type NotesExportInput } from "./export";
+import { buildNotesExport, exportTimeZone, pairAiMessages, parseRichText, type NotesExportInput } from "./export";
 import type { AiMessage } from "./types";
 
 const ai = (role: AiMessage["role"], content: string, extra: Partial<AiMessage> = {}): AiMessage => ({
@@ -19,32 +19,62 @@ const input = (extra: Partial<NotesExportInput> = {}): NotesExportInput => ({
   annotations: [],
   questions: [],
   aiMessages: [],
+  timeZone: "UTC",
   ...extra,
 });
 
 describe("pairAiMessages", () => {
+  const pairs = (messages: AiMessage[]) =>
+    pairAiMessages(messages).map((p) => [p.question?.content ?? null, p.answer?.content ?? null]);
+
   it("pairs each question with the reply that followed it", () => {
-    const pairs = pairAiMessages([
-      ai("student", "q1"),
-      ai("assistant", "a1"),
-      ai("student", "q2", { status: "failed" }),
-      ai("student", "q3"),
-      ai("assistant", "a3"),
-    ]);
-    expect(pairs.map((p) => [p.question.content, p.answer?.content ?? null])).toEqual([
+    expect(
+      pairs([
+        ai("student", "q1"),
+        ai("assistant", "a1"),
+        ai("student", "q2", { status: "failed" }),
+        ai("student", "q3"),
+        ai("assistant", "a3"),
+      ]),
+    ).toEqual([
       ["q1", "a1"],
       ["q2", null],
       ["q3", "a3"],
     ]);
   });
 
-  it("ignores a reply with no question before it", () => {
-    expect(pairAiMessages([ai("assistant", "orphan"), ai("student", "q")])).toHaveLength(1);
+  it("keeps overlapping requests (two tabs) in order", () => {
+    expect(pairs([ai("student", "q1"), ai("student", "q2"), ai("assistant", "a1"), ai("assistant", "a2")])).toEqual([
+      ["q1", "a1"],
+      ["q2", "a2"],
+    ]);
+  });
+
+  it("never gives a reply to a question that is still pending or failed", () => {
+    expect(
+      pairs([
+        ai("student", "slow", { status: "pending" }),
+        ai("student", "broken", { status: "failed" }),
+        ai("student", "q"),
+        ai("assistant", "a"),
+      ]),
+    ).toEqual([
+      ["slow", null],
+      ["broken", null],
+      ["q", "a"],
+    ]);
+  });
+
+  it("keeps a reply with no question waiting instead of dropping it", () => {
+    expect(pairs([ai("assistant", "orphan"), ai("student", "q")])).toEqual([
+      [null, "orphan"],
+      ["q", null],
+    ]);
   });
 });
 
 describe("buildNotesExport", () => {
-  it("includes Lecture AI questions and answers in order, with readable maths", () => {
+  it("includes Lecture AI questions and answers in order, with readable maths in the answers", () => {
     const doc = buildNotesExport(
       input({
         notes: "Power rule",
@@ -65,7 +95,7 @@ describe("buildNotesExport", () => {
       {
         kind: "qa",
         label: "Question 1 · Slide 3",
-        question: "What is x² differentiated?",
+        question: "What is $x^2$ differentiated?",
         answer: "It is 2x, by the power rule d/dx xⁿ = n xⁿ⁻¹.",
         answered: true,
       },
@@ -75,8 +105,19 @@ describe("buildNotesExport", () => {
   });
 
   it("keeps the student's own notes exactly as typed", () => {
-    const doc = buildNotesExport(input({ notes: "Costs $5 and $10" }));
-    expect(doc.sections[0].items).toEqual([{ kind: "text", text: "Costs $5 and $10" }]);
+    const doc = buildNotesExport(input({ notes: "Costs $5 and $10\n  2**10 = 1024" }));
+    expect(doc.sections[0].items).toEqual([{ kind: "text", text: "Costs $5 and $10\n  2**10 = 1024" }]);
+  });
+
+  it("labels a reply without a question", () => {
+    const doc = buildNotesExport(input({ aiMessages: [ai("assistant", "Hello")] }));
+    expect(doc.sections[1].items).toEqual([{ kind: "qa", label: "Lecture AI reply", question: null, answer: "Hello", answered: true }]);
+  });
+
+  it("dates the lecture in the student's time zone", () => {
+    const late = { title: "Graphs", module: null, lecturerName: null, date: "2026-10-04T00:30:00Z" };
+    expect(buildNotesExport(input({ lecture: late })).byline).toBe("Notes for Sam · 4 October 2026");
+    expect(buildNotesExport(input({ lecture: late, timeZone: "America/Chicago" })).byline).toBe("Notes for Sam · 3 October 2026");
   });
 
   it("groups annotations by slide and tags lecturer questions", () => {
@@ -121,6 +162,16 @@ describe("buildNotesExport", () => {
   });
 });
 
+describe("exportTimeZone", () => {
+  it("accepts valid IANA zones and falls back to UTC", () => {
+    expect(exportTimeZone("Europe/London")).toBe("Europe/London");
+    expect(exportTimeZone("Not/AZone")).toBe("UTC");
+    expect(exportTimeZone("")).toBe("UTC");
+    expect(exportTimeZone(null)).toBe("UTC");
+    expect(exportTimeZone("x".repeat(100))).toBe("UTC");
+  });
+});
+
 describe("parseRichText", () => {
   it("splits paragraphs, lists, headings and bold text", () => {
     expect(parseRichText("## Rules\nUse the **chain** rule.\n\n- first\n* second\n2) next\n\n\n#hashtag")).toEqual([
@@ -140,6 +191,10 @@ describe("parseRichText", () => {
       { kind: "gap" },
       { kind: "paragraph", runs: [{ text: "#hashtag", bold: false }] },
     ]);
+  });
+
+  it("only treats short numbers as list markers", () => {
+    expect(parseRichText("2026. A good year")).toEqual([{ kind: "paragraph", runs: [{ text: "2026. A good year", bold: false }] }]);
   });
 
   it("drops leading and trailing blank lines", () => {

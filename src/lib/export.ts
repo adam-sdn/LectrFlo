@@ -17,11 +17,12 @@ export interface ExportSection {
 }
 
 export type ExportItem =
-  /** Free text with light Markdown: paragraphs, "-" / "1." lists and **bold**. */
+  /** The student's own text, printed exactly as typed (line breaks and indentation kept, no Markdown). */
   | { kind: "text"; text: string }
   | { kind: "subheading"; text: string }
   | { kind: "entry"; text: string; meta: string | null }
-  | { kind: "qa"; label: string; question: string; answer: string; answered: boolean };
+  /** A Lecture AI exchange. `answer` uses light Markdown: paragraphs, "-" / "1." lists and **bold**. */
+  | { kind: "qa"; label: string; question: string | null; answer: string; answered: boolean };
 
 export interface NotesExportInput {
   lecture: { title: string; module: string | null; lecturerName: string | null; date: string | null };
@@ -31,31 +32,64 @@ export interface NotesExportInput {
   questions: StudentQuestion[];
   /** The student's whole Lecture AI conversation, oldest first. */
   aiMessages: AiMessage[];
+  /** IANA time zone for the lecture date (see `exportTimeZone`). */
+  timeZone: string;
 }
 
-const dateFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+/** The student's time zone if the browser sent a valid one, so the lecture date isn't a day off. */
+export function exportTimeZone(requested: string | null): string {
+  if (!requested || requested.length > 64) return "UTC";
+  try {
+    return new Intl.DateTimeFormat("en-GB", { timeZone: requested }).resolvedOptions().timeZone;
+  } catch {
+    return "UTC";
+  }
+}
 
-/** Pairs each question to Lecture AI with the reply that followed it. */
-export function pairAiMessages(messages: AiMessage[]): { question: AiMessage; answer: AiMessage | null }[] {
-  const pairs: { question: AiMessage; answer: AiMessage | null }[] = [];
+type AiPair = { question: AiMessage | null; answer: AiMessage | null };
+
+/**
+ * Pairs questions to Lecture AI with their replies. Nothing links a reply to its question, but a reply is
+ * saved just after its question is marked complete, so each reply goes to the oldest completed question
+ * still waiting. That keeps overlapping requests (two tabs) in order. Failed and still-pending questions
+ * never take a reply, and a reply with no question waiting is kept on its own rather than dropped.
+ */
+export function pairAiMessages(messages: AiMessage[]): AiPair[] {
+  const pairs: AiPair[] = [];
+  const waiting: AiPair[] = [];
   for (const message of messages) {
-    if (message.role === "student") pairs.push({ question: message, answer: null });
-    else if (pairs.length && !pairs[pairs.length - 1].answer) pairs[pairs.length - 1].answer = message;
+    if (message.role === "student") {
+      const pair: AiPair = { question: message, answer: null };
+      pairs.push(pair);
+      if (message.status === "complete") waiting.push(pair);
+    } else {
+      const pair = waiting.shift();
+      if (pair) pair.answer = message;
+      else pairs.push({ question: null, answer: message });
+    }
   }
   return pairs;
 }
 
 export function buildNotesExport(input: NotesExportInput): NotesExport {
   const { lecture } = input;
-  const date = lecture.date ? dateFormat.format(new Date(lecture.date)) : null;
+  const date = lecture.date
+    ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: input.timeZone }).format(
+        new Date(lecture.date),
+      )
+    : null;
 
-  const qa: ExportItem[] = pairAiMessages(input.aiMessages).map(({ question, answer }, i) => ({
+  let asked = 0;
+  const qa: ExportItem[] = pairAiMessages(input.aiMessages).map(({ question, answer }) => ({
     kind: "qa",
-    label: [`Question ${i + 1}`, question.slideNumber ? `Slide ${question.slideNumber}` : null].filter(Boolean).join(" · "),
-    question: plainMath(question.content),
+    label: question
+      ? [`Question ${++asked}`, question.slideNumber ? `Slide ${question.slideNumber}` : null].filter(Boolean).join(" · ")
+      : "Lecture AI reply",
+    // The student's question is shown as they typed it; only Lecture AI's LaTeX is made readable, as on screen.
+    question: question?.content ?? null,
     answer: answer
       ? plainMath(answer.content)
-      : question.status === "failed"
+      : question?.status === "failed"
         ? "Lecture AI couldn't answer this question."
         : "No answer was saved for this question.",
     answered: Boolean(answer),
@@ -128,7 +162,7 @@ export function parseRichText(text: string): RichBlock[] {
   for (const raw of text.split("\n")) {
     const line = raw.trim();
     const bullet = line.match(/^[-*•]\s+(.*)$/);
-    const numbered = line.match(/^(\d+)[.)]\s+(.*)$/);
+    const numbered = line.match(/^(\d{1,3})[.)]\s+(.*)$/);
     const heading = line.match(/^#{1,6}\s+(.*)$/);
     if (!line) {
       if (blocks.length && blocks[blocks.length - 1].kind !== "gap") blocks.push({ kind: "gap" });

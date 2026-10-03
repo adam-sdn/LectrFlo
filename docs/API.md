@@ -78,7 +78,7 @@ draft --open--> lobby --start--> live --end--> ended
 | `POST /api/student/lectures/:id/ai` | `{ message }` (≤2000 chars) | `201 { messages: [studentMessage, assistantMessage] }`. `502 ai_failed` with `details.message` (the failed student message), `503 ai_unavailable`, `429` (10 per 5 min) |
 | `GET /api/student/lectures/:id/recap` | – | `StudentRecapResponse` (`report` null until generated). Ended only |
 | `POST /api/student/lectures/:id/recap` | `{ regenerate?: boolean }` | `StudentRecapResponse` with `report.status` `complete` or `failed` |
-| `GET /api/student/lectures/:id/export` | – | `application/pdf` attachment: notes, Lecture AI questions and answers, slide annotations and questions to the lecturer |
+| `GET /api/student/lectures/:id/export` | `?tz=` IANA time zone (optional, dates the lecture; default UTC) | `application/pdf` attachment: notes, Lecture AI questions and answers, slide annotations and questions to the lecturer |
 | `GET /api/student/lectures/:id/voice` | – | `{ status, slideNumber, slideCount, summary }` current revealed slide (used by the voice agent's `get_current_slide` tool) |
 | `POST /api/student/lectures/:id/voice` | – | `{ signedUrl, dynamicVariables }` starts a private ElevenLabs voice session. `503 voice_unavailable` without `ELEVENLABS_API_KEY`/`ELEVENLABS_AGENT_ID`, `502 voice_failed` if ElevenLabs refuses (the message names its HTTP status and error code, e.g. `401 missing_permissions`) |
 

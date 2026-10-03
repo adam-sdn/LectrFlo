@@ -1,13 +1,19 @@
 import { route } from "@/lib/api";
 import { requireParticipant } from "@/lib/auth";
-import { buildNotesExport } from "@/lib/export";
+import { buildNotesExport, exportTimeZone } from "@/lib/export";
 import { renderNotesPdf } from "@/lib/notes-pdf";
 import { loadStudentActivity } from "@/lib/student-activity";
 
 type Ctx = { params: Promise<{ lectureId: string }> };
 
-/** Downloads the student's notes, Lecture AI questions and answers, annotations and questions as a PDF. */
-export const GET = route<Ctx>(async (_req, { params }) => {
+// Long notes and AI conversations take a few seconds to lay out; fits every Vercel plan.
+export const maxDuration = 60;
+
+/**
+ * Downloads the student's notes, Lecture AI questions and answers, annotations and questions as a PDF.
+ * `?tz=` (an IANA time zone from the browser) dates the lecture in the student's time zone.
+ */
+export const GET = route<Ctx>(async (req, { params }) => {
   const { participant, lecture } = await requireParticipant((await params).lectureId);
   const activity = await loadStudentActivity(participant.id);
   const pdf = await renderNotesPdf(
@@ -23,6 +29,7 @@ export const GET = route<Ctx>(async (_req, { params }) => {
       annotations: activity.annotations,
       questions: activity.questions,
       aiMessages: activity.aiMessages,
+      timeZone: exportTimeZone(new URL(req.url).searchParams.get("tz")),
     }),
   );
   const filename = `${lecture.title.replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "lecture"}-notes.pdf`;
