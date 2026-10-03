@@ -1,14 +1,33 @@
 -- LectrFlow MVP schema.
+-- Idempotent: safe to run again (e.g. pasted into the Supabase SQL Editor) to add anything missing.
 -- All application writes go through Next.js route handlers using the service role,
 -- which enforce lecturer ownership and student participant tokens. RLS is enabled
 -- on every table; the only client-facing policies are read-only for lecturers.
 
-create type public.lecture_status as enum ('draft', 'lobby', 'live', 'ended');
-create type public.question_status as enum ('open', 'answered', 'dismissed');
-create type public.ai_message_role as enum ('student', 'assistant');
-create type public.ai_job_status as enum ('pending', 'complete', 'failed');
-create type public.ai_report_kind as enum ('student_recap', 'lecturer_insight');
-create type public.objective_source as enum ('lecturer', 'ai');
+do $$ begin
+  create type public.lecture_status as enum ('draft', 'lobby', 'live', 'ended');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type public.question_status as enum ('open', 'answered', 'dismissed');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type public.ai_message_role as enum ('student', 'assistant');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type public.ai_job_status as enum ('pending', 'complete', 'failed');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type public.ai_report_kind as enum ('student_recap', 'lecturer_insight');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type public.objective_source as enum ('lecturer', 'ai');
+exception when duplicate_object then null;
+end $$;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -22,7 +41,7 @@ $$;
 
 -- Lectures -------------------------------------------------------------------
 
-create table public.lectures (
+create table if not exists public.lectures (
   id uuid primary key default gen_random_uuid(),
   lecturer_id uuid not null references auth.users (id) on delete cascade,
   lecturer_name text check (char_length(lecturer_name) <= 120),
@@ -40,13 +59,14 @@ create table public.lectures (
   updated_at timestamptz not null default now()
 );
 
-create index lectures_lecturer_id_idx on public.lectures (lecturer_id, created_at desc);
+create index if not exists lectures_lecturer_id_idx on public.lectures (lecturer_id, created_at desc);
 
+drop trigger if exists lectures_set_updated_at on public.lectures;
 create trigger lectures_set_updated_at
 before update on public.lectures
 for each row execute function public.set_updated_at();
 
-create table public.lecture_slides (
+create table if not exists public.lecture_slides (
   id uuid primary key default gen_random_uuid(),
   lecture_id uuid not null references public.lectures (id) on delete cascade,
   slide_number integer not null check (slide_number >= 1),
@@ -58,7 +78,7 @@ create table public.lecture_slides (
   unique (lecture_id, slide_number)
 );
 
-create table public.learning_objectives (
+create table if not exists public.learning_objectives (
   id uuid primary key default gen_random_uuid(),
   lecture_id uuid not null references public.lectures (id) on delete cascade,
   position integer not null check (position >= 1),
@@ -70,7 +90,7 @@ create table public.learning_objectives (
 
 -- Students -------------------------------------------------------------------
 
-create table public.lecture_participants (
+create table if not exists public.lecture_participants (
   id uuid primary key default gen_random_uuid(),
   lecture_id uuid not null references public.lectures (id) on delete cascade,
   display_name text not null check (char_length(display_name) between 1 and 60),
@@ -81,9 +101,9 @@ create table public.lecture_participants (
   unique (id, lecture_id)
 );
 
-create index lecture_participants_lecture_idx on public.lecture_participants (lecture_id, joined_at);
+create index if not exists lecture_participants_lecture_idx on public.lecture_participants (lecture_id, joined_at);
 
-create table public.student_notes (
+create table if not exists public.student_notes (
   id uuid primary key default gen_random_uuid(),
   lecture_id uuid not null,
   participant_id uuid not null unique,
@@ -94,11 +114,12 @@ create table public.student_notes (
     references public.lecture_participants (id, lecture_id) on delete cascade
 );
 
+drop trigger if exists student_notes_set_updated_at on public.student_notes;
 create trigger student_notes_set_updated_at
 before update on public.student_notes
 for each row execute function public.set_updated_at();
 
-create table public.slide_annotations (
+create table if not exists public.slide_annotations (
   id uuid primary key default gen_random_uuid(),
   lecture_id uuid not null,
   participant_id uuid not null,
@@ -113,14 +134,15 @@ create table public.slide_annotations (
     references public.lecture_participants (id, lecture_id) on delete cascade
 );
 
-create index slide_annotations_participant_idx
+create index if not exists slide_annotations_participant_idx
   on public.slide_annotations (participant_id, slide_number, created_at);
 
+drop trigger if exists slide_annotations_set_updated_at on public.slide_annotations;
 create trigger slide_annotations_set_updated_at
 before update on public.slide_annotations
 for each row execute function public.set_updated_at();
 
-create table public.student_questions (
+create table if not exists public.student_questions (
   id uuid primary key default gen_random_uuid(),
   lecture_id uuid not null,
   participant_id uuid not null,
@@ -133,10 +155,10 @@ create table public.student_questions (
     references public.lecture_participants (id, lecture_id) on delete cascade
 );
 
-create index student_questions_lecture_idx on public.student_questions (lecture_id, created_at);
-create index student_questions_participant_idx on public.student_questions (participant_id, created_at);
+create index if not exists student_questions_lecture_idx on public.student_questions (lecture_id, created_at);
+create index if not exists student_questions_participant_idx on public.student_questions (participant_id, created_at);
 
-create table public.confusion_signals (
+create table if not exists public.confusion_signals (
   id uuid primary key default gen_random_uuid(),
   lecture_id uuid not null,
   participant_id uuid not null,
@@ -146,12 +168,12 @@ create table public.confusion_signals (
     references public.lecture_participants (id, lecture_id) on delete cascade
 );
 
-create index confusion_signals_lecture_idx on public.confusion_signals (lecture_id, created_at);
-create index confusion_signals_participant_idx on public.confusion_signals (participant_id, created_at desc);
+create index if not exists confusion_signals_lecture_idx on public.confusion_signals (lecture_id, created_at);
+create index if not exists confusion_signals_participant_idx on public.confusion_signals (participant_id, created_at desc);
 
 -- AI -------------------------------------------------------------------------
 
-create table public.ai_messages (
+create table if not exists public.ai_messages (
   id uuid primary key default gen_random_uuid(),
   lecture_id uuid not null,
   participant_id uuid not null,
@@ -165,9 +187,9 @@ create table public.ai_messages (
     references public.lecture_participants (id, lecture_id) on delete cascade
 );
 
-create index ai_messages_participant_idx on public.ai_messages (participant_id, created_at);
+create index if not exists ai_messages_participant_idx on public.ai_messages (participant_id, created_at);
 
-create table public.ai_reports (
+create table if not exists public.ai_reports (
   id uuid primary key default gen_random_uuid(),
   lecture_id uuid not null references public.lectures (id) on delete cascade,
   -- Null for lecture-level reports (lecturer insight).
@@ -183,6 +205,7 @@ create table public.ai_reports (
   check ((kind = 'student_recap') = (participant_id is not null))
 );
 
+drop trigger if exists ai_reports_set_updated_at on public.ai_reports;
 create trigger ai_reports_set_updated_at
 before update on public.ai_reports
 for each row execute function public.set_updated_at();
@@ -200,10 +223,12 @@ alter table public.confusion_signals enable row level security;
 alter table public.ai_messages enable row level security;
 alter table public.ai_reports enable row level security;
 
+drop policy if exists "Lecturers read their lectures" on public.lectures;
 create policy "Lecturers read their lectures"
   on public.lectures for select to authenticated
   using (lecturer_id = (select auth.uid()));
 
+drop policy if exists "Lecturers read their slides" on public.lecture_slides;
 create policy "Lecturers read their slides"
   on public.lecture_slides for select to authenticated
   using (exists (
@@ -211,6 +236,7 @@ create policy "Lecturers read their slides"
     where l.id = lecture_id and l.lecturer_id = (select auth.uid())
   ));
 
+drop policy if exists "Lecturers read their objectives" on public.learning_objectives;
 create policy "Lecturers read their objectives"
   on public.learning_objectives for select to authenticated
   using (exists (
@@ -218,6 +244,7 @@ create policy "Lecturers read their objectives"
     where l.id = lecture_id and l.lecturer_id = (select auth.uid())
   ));
 
+drop policy if exists "Lecturers read their questions" on public.student_questions;
 create policy "Lecturers read their questions"
   on public.student_questions for select to authenticated
   using (exists (
@@ -225,6 +252,7 @@ create policy "Lecturers read their questions"
     where l.id = lecture_id and l.lecturer_id = (select auth.uid())
   ));
 
+drop policy if exists "Lecturers read their lecture reports" on public.ai_reports;
 create policy "Lecturers read their lecture reports"
   on public.ai_reports for select to authenticated
   using (
@@ -246,3 +274,12 @@ values (
   array['image/png', 'image/jpeg', 'image/webp']
 )
 on conflict (id) do nothing;
+
+-- Setup check: every row should say true.
+select t.name as item, to_regclass('public.' || t.name) is not null as present
+from unnest(array[
+  'lectures', 'lecture_slides', 'learning_objectives', 'lecture_participants', 'student_notes',
+  'slide_annotations', 'student_questions', 'confusion_signals', 'ai_messages', 'ai_reports'
+]) as t(name)
+union all
+select 'storage bucket lecture-slides', exists (select 1 from storage.buckets where id = 'lecture-slides');

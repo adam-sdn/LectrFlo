@@ -26,4 +26,10 @@ export const studentApi = {
   askAi: (id: string, message: string) =>
     apiRequest<{ messages: AiMessage[] }>(`/api/student/lectures/${id}/ai`, { method: "POST", body: { message } }),
   exportUrl: (id: string) => `/api/student/lectures/${id}/export`,
+  voiceSession: (id: string) =>
+    apiRequest<{ signedUrl: string; dynamicVariables: Record<string, string> }>(`/api/student/lectures/${id}/voice`, {
+      method: "POST",
+    }),
+  voiceSlide: (id: string) =>
+    apiRequest<{ slideNumber: number | null; slideCount: number; summary: string }>(`/api/student/lectures/${id}/voice`),
 };

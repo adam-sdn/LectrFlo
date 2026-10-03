@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SlideViewer } from "@/components/slide-viewer";
+import dynamic from "next/dynamic";
 import { AiChat } from "@/components/student/ai-chat";
 import { AskLecturer, ConfusedButton } from "@/components/student/interaction-panels";
 import { NotesPanel, type NotesHandle } from "@/components/student/notes-panel";
@@ -15,6 +16,11 @@ import { studentApi } from "@/lib/client/student-api";
 import type { LectureChannelEvents } from "@/lib/realtime";
 import type { StudentLectureState } from "@/lib/types";
 
+// Browser-only (microphone, audio); loaded on the client so the page renders without it.
+const VoiceTutor = dynamic(() => import("@/components/student/voice-tutor").then((m) => m.VoiceTutor), {
+  ssr: false,
+});
+
 export default function StudentLecturePage() {
   const { lectureId } = useParams<{ lectureId: string }>();
   const [state, setState] = useState<StudentLectureState | null>(null);
@@ -23,6 +29,12 @@ export default function StudentLecturePage() {
   const [urlCache] = useState(createSlideUrlCache);
   const loadVersion = useRef(0);
   const notesRef = useRef<NotesHandle>(null);
+  const [questionsVersion, setQuestionsVersion] = useState(0);
+  const saveVoiceNote = useCallback(async (text: string) => {
+    if (!notesRef.current) throw new Error("Notes aren't loaded yet");
+    await notesRef.current.append(text);
+  }, []);
+  const onVoiceQuestion = useCallback(() => setQuestionsVersion((v) => v + 1), []);
 
   const load = useCallback(async () => {
     const version = ++loadVersion.current;
@@ -164,7 +176,7 @@ export default function StudentLecturePage() {
             {!ended && (
               <div className="grid gap-4 xl:grid-cols-2">
                 <ConfusedButton lectureId={lectureId} live={live} currentSlide={lecture.currentSlide} />
-                <AskLecturer lectureId={lectureId} live={live} />
+                <AskLecturer lectureId={lectureId} live={live} refreshKey={questionsVersion} />
               </div>
             )}
 
@@ -185,6 +197,7 @@ export default function StudentLecturePage() {
           </div>
 
           <div className="space-y-4 lg:col-span-5">
+            <VoiceTutor lectureId={lectureId} onSaveNote={saveVoiceNote} onQuestionSent={onVoiceQuestion} />
             <AiChat lectureId={lectureId} />
             <NotesPanel lectureId={lectureId} ref={notesRef} />
           </div>

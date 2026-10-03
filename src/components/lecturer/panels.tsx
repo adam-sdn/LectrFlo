@@ -1,6 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Button, Card, Spinner } from "@/components/ui";
 import type { ConfusionSummary, LectureStatus, LecturerQuestion } from "@/lib/types";
 
@@ -65,17 +66,101 @@ export function LectureControls({
 
 export function JoinCodeCard({ joinCode, status }: { joinCode: string; status: LectureStatus }) {
   const origin = useOrigin();
+  const [enlarged, setEnlarged] = useState(false);
   const joinable = status === "lobby" || status === "live";
+  const joinPage = origin ? `${origin.replace(/^https?:\/\//, "")}/join` : "/join";
+  // Scanning opens the join page with the code already filled in.
+  const joinUrl = origin ? `${origin}/join?code=${joinCode}` : null;
+
   return (
     <Card title="Join code">
-      <p className="font-mono text-4xl font-bold tracking-[0.2em] text-slate-900" aria-label={`Join code ${joinCode.split("").join(" ")}`}>
-        {joinCode}
-      </p>
-      <p className="mt-2 text-sm text-slate-600">
-        Students go to <span className="font-semibold text-slate-900">{origin ? `${origin.replace(/^https?:\/\//, "")}/join` : "/join"}</span>
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="font-mono text-4xl font-bold tracking-[0.2em] text-slate-900" aria-label={`Join code ${joinCode.split("").join(" ")}`}>
+            {joinCode}
+          </p>
+          <p className="mt-2 text-sm text-slate-600">
+            Students go to
+            <span className="block font-semibold break-all text-slate-900">{joinPage}</span>
+          </p>
+          <p className="mt-1 text-sm text-slate-600">or scan the QR code with their phone.</p>
+        </div>
+        {joinUrl && (
+          <button
+            type="button"
+            onClick={() => setEnlarged(true)}
+            className="shrink-0 rounded-lg bg-white p-1.5 ring-1 ring-slate-200 transition hover:ring-indigo-400 focus-visible:outline-2 focus-visible:outline-indigo-600"
+            aria-label="Enlarge QR code for projecting"
+            title="Enlarge for projecting"
+          >
+            <QRCodeSVG value={joinUrl} size={104} level="M" marginSize={1} title={`Join ${joinCode}`} />
+          </button>
+        )}
+      </div>
+      {joinUrl && (
+        <button
+          type="button"
+          onClick={() => setEnlarged(true)}
+          className="mt-3 text-xs font-semibold text-indigo-600 hover:text-indigo-500"
+        >
+          Show large QR code for the room →
+        </button>
+      )}
       {!joinable && <p className="mt-2 text-xs font-medium text-amber-700">Open the lobby to let students join.</p>}
+      {enlarged && joinUrl && (
+        <QrOverlay joinUrl={joinUrl} joinCode={joinCode} joinPage={joinPage} onClose={() => setEnlarged(false)} />
+      )}
     </Card>
+  );
+}
+
+function QrOverlay({
+  joinUrl,
+  joinCode,
+  joinPage,
+  onClose,
+}: {
+  joinUrl: string;
+  joinCode: string;
+  joinPage: string;
+  onClose: () => void;
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Join this lecture"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6 text-center"
+    >
+      <p className="text-2xl font-bold text-slate-900 sm:text-3xl">Scan to join the lecture</p>
+      <QRCodeSVG
+        value={joinUrl}
+        size={480}
+        level="M"
+        marginSize={2}
+        title={`Join ${joinCode}`}
+        className="h-auto w-[min(70vh,80vw)] max-w-full"
+      />
+      <div>
+        <p className="font-mono text-5xl font-bold tracking-[0.25em] text-slate-900">{joinCode}</p>
+        <p className="mt-2 text-lg text-slate-600">
+          or go to <span className="font-semibold text-slate-900">{joinPage}</span>
+        </p>
+      </div>
+      <Button ref={closeRef} variant="secondary" onClick={onClose}>
+        Close (Esc)
+      </Button>
+    </div>
   );
 }
 

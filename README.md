@@ -22,8 +22,10 @@ npm run dev
 
 For a hosted Supabase project:
 
-1. Apply the schema: `npx supabase link --project-ref <ref>` then `npx supabase db push`
-   (or paste `supabase/migrations/*.sql` into the SQL editor).
+1. Apply the schema: `npx supabase link --project-ref <ref>` then `npx supabase db push`,
+   or paste the **whole** of `supabase/migrations/20261003000000_init.sql` into the SQL Editor and
+   run it. It is safe to run again and ends with a check that should show `true` on every row.
+   `/api/health?write=1` on the deployed app reports anything still missing.
 2. Enable **Authentication → Sign In / Providers → Allow anonymous sign-ins**. The MVP has no
    lecturer sign-in screen; `/lecturer` uses an anonymous Supabase session, and each browser owns
    the lectures it creates.

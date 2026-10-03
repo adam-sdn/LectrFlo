@@ -79,6 +79,8 @@ draft --open--> lobby --start--> live --end--> ended
 | `GET /api/student/lectures/:id/recap` | – | `StudentRecapResponse` (`report` null until generated). Ended only |
 | `POST /api/student/lectures/:id/recap` | `{ regenerate?: boolean }` | `StudentRecapResponse` with `report.status` `complete` or `failed` |
 | `GET /api/student/lectures/:id/export` | – | `text/markdown` attachment of notes, annotations and questions |
+| `GET /api/student/lectures/:id/voice` | – | `{ status, slideNumber, slideCount, summary }` current revealed slide (used by the voice agent's `get_current_slide` tool) |
+| `POST /api/student/lectures/:id/voice` | – | `{ signedUrl, dynamicVariables }` starts a private ElevenLabs voice session. `503 voice_unavailable` without `ELEVENLABS_API_KEY`/`ELEVENLABS_AGENT_ID`, `502 voice_failed` if ElevenLabs refuses |
 
 ### Join error codes
 
@@ -116,3 +118,15 @@ REST state on (re)connect.
 
 On `lecture_state` or `slides_updated`, students should refetch `GET /api/student/lectures/:id`
 to get newly revealed slide URLs.
+
+## Voice tutor (ElevenLabs Agents)
+
+Optional spoken Lecture AI on the student page (`src/components/student/voice-tutor.tsx`, `@elevenlabs/react`).
+The server exchanges `ELEVENLABS_API_KEY` for a short-lived signed URL (`POST …/voice`); the key never
+reaches the browser. The agent is configured in the ElevenLabs dashboard with authentication enabled and:
+
+- Dynamic variables used in its prompt: `student_name`, `lecture_title`, `module`, `objectives`,
+  `current_slide`, `slide_text`, `confused_slides` (all always provided).
+- Client tools (executed in the student's browser through the normal student API, so the usual
+  permission checks apply): `get_current_slide`, `mark_confused`, `ask_lecturer` (`question`),
+  `save_note` (`text`). Logic lives in `src/lib/client/voice-tools.ts`.

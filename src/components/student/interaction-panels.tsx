@@ -57,7 +57,7 @@ export function ConfusedButton({ lectureId, live, currentSlide }: { lectureId: s
 }
 
 /** Questions routed to the human lecturer (anonymous to them). */
-export function AskLecturer({ lectureId, live }: { lectureId: string; live: boolean }) {
+export function AskLecturer({ lectureId, live, refreshKey = 0 }: { lectureId: string; live: boolean; refreshKey?: number }) {
   const [questions, setQuestions] = useState<StudentQuestion[]>([]);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -75,7 +75,7 @@ export function AskLecturer({ lectureId, live }: { lectureId: string; live: bool
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
