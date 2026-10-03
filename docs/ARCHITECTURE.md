@@ -7,7 +7,7 @@ Hackathon MVP. Keep it simple: one Next.js app, one Supabase project.
 - **Next.js 16** (App Router, TypeScript) — UI and API route handlers in one app.
 - **Supabase** — Postgres, Auth (lecturers), Storage (slide images), Realtime Broadcast.
 - **Gemini** (REST, optional) behind `src/lib/ai/provider.ts`.
-- **zod** for request validation; **vitest** for unit tests.
+- **Tailwind CSS v4** for styling; **zod** for request validation; **vitest** for unit tests.
 
 ## Principles
 
@@ -47,8 +47,21 @@ scripts/smoke-test.mjs        end-to-end API test
 
 See `.env.example`. `SUPABASE_SERVICE_ROLE_KEY` and `GEMINI_API_KEY` are server-only.
 
-## Frontend contract
+## Frontend
 
-Build UI against `docs/API.md` and the types in `src/lib/types.ts`. Suggested pages (not yet built):
-student join `/join` and `/join/[code]` (QR target), student lecture `/lecture/[lectureId]`,
-recap `/lecture/[lectureId]/recap`, lecturer dashboard `/lecturer/...`.
+Pages (client components using `src/lib/client/*` to call the API):
+
+| Route | Who | Purpose |
+| --- | --- | --- |
+| `/` | everyone | Choose student or lecturer |
+| `/lecturer` | lecturer | List lectures, create the demo lecture |
+| `/lecturer/[lectureId]` | lecturer | Live console: slides, lifecycle, students, confusion meter, questions; AI insight report after ending |
+| `/join` (`?code=`) | student | Join with code + display name |
+| `/lecture/[lectureId]` | student | Live slide, notes, "I'm confused", ask lecturer, private Lecture AI |
+
+- Lecturer API calls send the Supabase access token as `Authorization: Bearer`; the session is an
+  anonymous Supabase session created on first visit (no sign-in UI in the MVP).
+- Live updates come from the realtime channels in `docs/API.md`; pages also poll as a fallback.
+- The demo lecture is built in the browser (`src/lib/client/demo-lecture.ts`): slides are drawn on a
+  canvas and uploaded as PNGs through the normal slide upload endpoint.
+- Styling: Tailwind CSS v4.

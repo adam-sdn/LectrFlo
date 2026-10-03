@@ -20,9 +20,28 @@ cp .env.example .env.local        # fill in from `npx supabase status -o env` (o
 npm run dev
 ```
 
-For a hosted Supabase project, apply `supabase/migrations/` with `npx supabase db push`.
+For a hosted Supabase project:
+
+1. Apply the schema: `npx supabase link --project-ref <ref>` then `npx supabase db push`
+   (or paste `supabase/migrations/*.sql` into the SQL editor).
+2. Enable **Authentication → Sign In / Providers → Allow anonymous sign-ins**. The MVP has no
+   lecturer sign-in screen; `/lecturer` uses an anonymous Supabase session, and each browser owns
+   the lectures it creates.
+3. Put the project URL, publishable (anon) key and secret (service role) key in `.env.local`.
+
 Set `GEMINI_API_KEY` to enable Lecture AI, objective extraction, recaps and reports; without it
 those endpoints return `503 ai_unavailable` and everything else works.
+
+## Demo
+
+1. Lecturer: open `/lecturer` → **Create demo lecture** (Calculus 101 — Differentiation) →
+   **Open lobby**. The join code is shown on the console.
+2. Students: open `/join` (or `/join?code=ABC234`), enter the code and a name.
+3. Lecturer: **Start lecture**, move with **Next/Previous** or the arrow keys. Watch students
+   connect, the "I'm confused" meter and anonymous questions update live.
+4. Students: take notes (autosaved, private), press **I'm confused**, ask the lecturer, ask
+   Lecture AI (private to each student).
+5. Lecturer: **End lecture** → the AI insight report is generated.
 
 ## Checks
 
