@@ -5,6 +5,7 @@
 // Creates throwaway lecturer accounts and a lecture, then deletes the lecture.
 
 import { createClient } from "@supabase/supabase-js";
+import { PDFDocument } from "pdf-lib";
 
 const APP = process.env.APP_URL ?? "http://localhost:3000";
 // "available" (default, real or mock provider), "unavailable" (no GEMINI_API_KEY) or "failing" (provider errors)
@@ -264,11 +265,16 @@ async function main() {
   const reportGet = await api(`/api/lectures/${id}/report`, { token: lecturer });
   check("report stats", reportGet.data.stats.participantCount === 2 && reportGet.data.stats.confusion[0].uniqueStudents === 2, reportGet.data);
 
-  const exported = await api(`/api/student/lectures/${id}/export`, { cookie: cookieA });
+  const exported = await fetch(`${APP}/api/student/lectures/${id}/export`, { headers: { cookie: cookieA } });
+  const pdf = new Uint8Array(await exported.arrayBuffer());
   check(
-    "export notes as markdown",
-    exported.status === 200 && exported.headers.get("content-disposition")?.includes("Graph-Algorithms-notes.md") && exported.data.includes("Revisit queues"),
-    exported.data,
+    "export notes as PDF",
+    exported.status === 200 &&
+      exported.headers.get("content-type") === "application/pdf" &&
+      exported.headers.get("content-disposition")?.includes("Graph-Algorithms-notes.pdf") &&
+      new TextDecoder().decode(pdf.slice(0, 5)) === "%PDF-" &&
+      (await PDFDocument.load(pdf)).getPageCount() >= 1,
+    { status: exported.status, type: exported.headers.get("content-type"), bytes: pdf.length },
   );
 
   await sleep(1000);

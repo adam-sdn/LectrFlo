@@ -1,19 +1,34 @@
 import { route } from "@/lib/api";
 import { requireParticipant } from "@/lib/auth";
-import { formatNotesExport } from "@/lib/export";
+import { buildNotesExport } from "@/lib/export";
+import { renderNotesPdf } from "@/lib/notes-pdf";
 import { loadStudentActivity } from "@/lib/student-activity";
 
 type Ctx = { params: Promise<{ lectureId: string }> };
 
-/** Downloads the student's notes, annotations and questions as Markdown. */
+/** Downloads the student's notes, Lecture AI questions and answers, annotations and questions as a PDF. */
 export const GET = route<Ctx>(async (_req, { params }) => {
   const { participant, lecture } = await requireParticipant((await params).lectureId);
   const activity = await loadStudentActivity(participant.id);
-  const markdown = formatNotesExport(lecture.title, lecture.module, activity);
-  const filename = `${lecture.title.replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "lecture"}-notes.md`;
-  return new Response(markdown, {
+  const pdf = await renderNotesPdf(
+    buildNotesExport({
+      lecture: {
+        title: lecture.title,
+        module: lecture.module,
+        lecturerName: lecture.lecturer_name,
+        date: lecture.started_at ?? lecture.created_at,
+      },
+      studentName: participant.display_name,
+      notes: activity.notes.content,
+      annotations: activity.annotations,
+      questions: activity.questions,
+      aiMessages: activity.aiMessages,
+    }),
+  );
+  const filename = `${lecture.title.replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "lecture"}-notes.pdf`;
+  return new Response(new Uint8Array(pdf), {
     headers: {
-      "Content-Type": "text/markdown; charset=utf-8",
+      "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
     },

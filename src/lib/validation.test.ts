@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { formatNotesExport } from "./export";
 import { createAnnotationSchema, createLectureSchema, joinSchema, updateLectureSchema } from "./validation";
 
 describe("validation", () => {
@@ -26,35 +25,5 @@ describe("validation", () => {
     expect(createAnnotationSchema.safeParse({ slideNumber: 1, content: "x", x: 0.5, y: 0.5 }).success).toBe(true);
     expect(createAnnotationSchema.safeParse({ slideNumber: 1, content: "x", x: 1.5 }).success).toBe(false);
     expect(createAnnotationSchema.safeParse({ slideNumber: 0, content: "x" }).success).toBe(false);
-  });
-});
-
-describe("formatNotesExport", () => {
-  it("groups annotations by slide", () => {
-    const md = formatNotesExport("Graphs", "CS201", {
-      notes: { content: "My notes", updatedAt: null },
-      annotations: [
-        { id: "1", slideNumber: 2, content: "first", x: null, y: null, createdAt: "", updatedAt: "" },
-        { id: "2", slideNumber: 2, content: "second", x: null, y: null, createdAt: "", updatedAt: "" },
-        { id: "3", slideNumber: 5, content: "third", x: null, y: null, createdAt: "", updatedAt: "" },
-      ],
-      questions: [{ id: "q", body: "Why?", slideNumber: 2, status: "answered", createdAt: "" }],
-    });
-    expect(md).toContain("# Graphs");
-    expect(md).toContain("My notes");
-    expect(md.match(/### Slide 2/g)).toHaveLength(1);
-    expect(md).toContain("### Slide 5");
-    expect(md).toContain("- (Slide 2) Why? — answered");
-  });
-
-  it("handles an empty lecture", () => {
-    const md = formatNotesExport("Graphs", null, {
-      notes: { content: "", updatedAt: null },
-      annotations: [],
-      questions: [],
-    });
-    expect(md).toContain("_No notes._");
-    expect(md).toContain("_No annotations._");
-    expect(md).toContain("_No questions._");
   });
 });
