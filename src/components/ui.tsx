@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import type { ConnectionStatus } from "@/lib/realtime-client";
@@ -38,10 +39,10 @@ export function Card({
   children: ReactNode;
 }) {
   return (
-    <section className={`rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 ${className}`}>
+    <section className={`border border-slate-200 bg-white p-6 ${className}`}>
       {(title || action) && (
         <div className="mb-3 flex items-center justify-between gap-3">
-          {title && <h2 className="text-sm font-semibold text-slate-900">{title}</h2>}
+          {title && <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{title}</h2>}
           {action}
         </div>
       )}
@@ -60,7 +61,7 @@ const STATUS_STYLES: Record<LectureStatus, { label: string; className: string }>
 export function StatusBadge({ status }: { status: LectureStatus }) {
   const style = STATUS_STYLES[status];
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${style.className}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-none px-2 py-0.5 text-[11px] font-semibold tracking-wider uppercase ${style.className}`}>
       {status === "live" && <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />}
       {style.label}
     </span>
@@ -100,13 +101,13 @@ export function ErrorNotice({ message, onRetry }: { message: string; onRetry?: (
 
 export function AppHeader({ role, children }: { role: "Lecturer" | "Student"; children?: ReactNode }) {
   return (
-    <header className="border-b border-slate-200 bg-white">
+    <header className="border-b border-slate-300 bg-white">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
-        <Link href="/" className="flex items-center gap-2 font-bold text-slate-900">
-          <span className="flex size-7 items-center justify-center rounded-lg bg-indigo-600 text-xs text-white">LF</span>
-          LectrFlow
+        <Link href="/" className="flex items-center gap-2.5 text-slate-900">
+          <Image src="/brand/lectrflo-mark.png" alt="" width={30} height={30} priority />
+          <span className="font-display text-xl font-bold tracking-tight">LectrFlo</span>
         </Link>
-        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{role}</span>
+        <span className="border-l border-slate-200 pl-3 text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">{role}</span>
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">{children}</div>
       </div>
     </header>

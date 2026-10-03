@@ -33,14 +33,14 @@ export function ConfusedButton({ lectureId, live, currentSlide }: { lectureId: s
   }
 
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+    <div className="border border-slate-200 bg-white p-6">
       <button
         type="button"
         onClick={send}
         disabled={!live || sending || cooldown > 0}
-        className="flex w-full items-center justify-center gap-3 rounded-xl bg-amber-400 px-6 py-4 text-lg font-bold text-amber-950 shadow-sm transition hover:bg-amber-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+        className="flex w-full items-center justify-center gap-3 border-2 border-slate-900 bg-white px-6 py-4 font-display text-xl font-semibold text-slate-900 transition hover:bg-slate-900 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
       >
-        {sending ? <Spinner className="size-5" /> : <span aria-hidden>🤔</span>}
+        {sending && <Spinner className="size-5" />}
         {cooldown > 0 ? `Signal sent (${cooldown}s)` : "I'm confused"}
       </button>
       <p className="mt-2 text-center text-xs text-slate-500" aria-live="polite">
@@ -97,7 +97,7 @@ export function AskLecturer({ lectureId, live, refreshKey = 0 }: { lectureId: st
   }
 
   return (
-    <Card title="💬 Ask the lecturer" action={<span className="text-xs text-slate-500">Anonymous</span>}>
+    <Card title="Ask the lecturer" action={<span className="text-xs text-slate-500">Anonymous</span>}>
       <form onSubmit={submit} className="flex gap-2">
         <label htmlFor="lecturer-question" className="sr-only">
           Question for the lecturer

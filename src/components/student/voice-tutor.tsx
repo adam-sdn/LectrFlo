@@ -85,16 +85,16 @@ function VoiceTutorPanel({ lectureId, onSaveNote, onQuestionSent }: VoiceTutorPr
   }
 
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-violet-200" aria-label="Voice tutor">
+    <section className="border border-violet-200 bg-white p-6" aria-label="Voice tutor">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">🎙 Talk to Lecture AI</h2>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Talk to Lecture AI</h2>
           <p className="text-xs text-slate-600">
             Ask out loud. It can also mark you as confused, ask the lecturer, or save notes for you.
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-200">
-          🔒 Private
+        <span className="shrink-0 rounded-none bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-violet-200">
+          Private
         </span>
       </div>
 
@@ -117,13 +117,13 @@ function VoiceTutorPanel({ lectureId, onSaveNote, onQuestionSent }: VoiceTutorPr
             </div>
           </div>
         ) : (
-          <Button onClick={start} disabled={connecting} className="w-full bg-violet-600 hover:bg-violet-500 disabled:bg-violet-300">
+          <Button onClick={start} disabled={connecting} className="w-full bg-violet-600 py-3 hover:bg-violet-700 disabled:bg-violet-300">
             {connecting ? (
               <>
                 <Spinner /> Connecting…
               </>
             ) : (
-              "🎙 Start talking"
+              "Start talking"
             )}
           </Button>
         )}

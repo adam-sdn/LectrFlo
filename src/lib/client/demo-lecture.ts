@@ -114,42 +114,42 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
 }
 
 function drawTitleSlide(ctx: CanvasRenderingContext2D, slide: DemoSlide) {
-  ctx.fillStyle = "#312e81";
+  ctx.fillStyle = "#1f2d52";
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#4f46e5";
+  ctx.fillStyle = "#a8803a";
   ctx.fillRect(0, H - 24, W, 24);
   ctx.fillStyle = "#ffffff";
-  ctx.font = `700 120px ${SANS}`;
+  ctx.font = `700 120px ${SERIF}`;
   ctx.fillText(slide.title, 120, 400);
-  ctx.fillStyle = "#c7d2fe";
+  ctx.fillStyle = "#e6d2a6";
   ctx.font = `600 72px ${SANS}`;
   ctx.fillText(slide.bullets[0], 120, 510);
-  ctx.fillStyle = "#e0e7ff";
+  ctx.fillStyle = "#f1f3f8";
   ctx.font = `400 40px ${SANS}`;
   ctx.fillText(slide.bullets[1], 120, 600);
 }
 
 function drawContentSlide(ctx: CanvasRenderingContext2D, slide: DemoSlide, index: number, total: number) {
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#fbfaf6";
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = "#4f46e5";
+  ctx.fillStyle = "#1f2d52";
   ctx.fillRect(0, 0, 16, H);
 
-  ctx.fillStyle = "#6366f1";
+  ctx.fillStyle = "#8a682e";
   ctx.font = `600 28px ${SANS}`;
   ctx.fillText("MATH 101 · DIFFERENTIATION", 100, 100);
-  ctx.fillStyle = "#0f172a";
-  ctx.font = `700 72px ${SANS}`;
+  ctx.fillStyle = "#1b1814";
+  ctx.font = `700 72px ${SERIF}`;
   ctx.fillText(slide.title, 100, 190);
 
   let y = 260;
   if (slide.formulas?.length) {
     const boxHeight = 60 + slide.formulas.length * 64;
-    ctx.fillStyle = "#eef2ff";
-    ctx.beginPath();
-    ctx.roundRect(100, y, W - 200, boxHeight, 20);
-    ctx.fill();
-    ctx.fillStyle = "#1e1b4b";
+    ctx.fillStyle = "#f1f3f8";
+    ctx.fillRect(100, y, W - 200, boxHeight);
+    ctx.fillStyle = "#1f2d52";
+    ctx.fillRect(100, y, 6, boxHeight);
+    ctx.fillStyle = "#1f2d52";
     ctx.font = `500 52px ${SERIF}`;
     slide.formulas.forEach((formula, i) => ctx.fillText(formula, 150, y + 82 + i * 64));
     y += boxHeight + 70;
@@ -159,11 +159,9 @@ function drawContentSlide(ctx: CanvasRenderingContext2D, slide: DemoSlide, index
 
   ctx.font = `400 40px ${SANS}`;
   for (const bullet of slide.bullets) {
-    ctx.fillStyle = "#6366f1";
-    ctx.beginPath();
-    ctx.arc(118, y - 13, 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#1e293b";
+    ctx.fillStyle = "#a8803a";
+    ctx.fillRect(110, y - 21, 14, 14);
+    ctx.fillStyle = "#2c2823";
     for (const line of wrap(ctx, bullet, W - 300)) {
       ctx.fillText(line, 150, y);
       y += 54;
@@ -171,7 +169,7 @@ function drawContentSlide(ctx: CanvasRenderingContext2D, slide: DemoSlide, index
     y += 22;
   }
 
-  ctx.fillStyle = "#94a3b8";
+  ctx.fillStyle = "#a39b8c";
   ctx.font = `400 24px ${SANS}`;
   ctx.fillText(`${index + 1} / ${total}`, W - 160, H - 50);
 }

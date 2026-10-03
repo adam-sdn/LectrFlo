@@ -105,14 +105,14 @@ export function AiChat({ lectureId }: { lectureId: string }) {
   }
 
   return (
-    <section className="flex h-[30rem] flex-col rounded-2xl bg-white shadow-sm ring-1 ring-indigo-200 lg:h-[36rem]">
+    <section className="flex h-[30rem] flex-col border border-slate-200 bg-white lg:h-[36rem]">
       <header className="flex items-start justify-between gap-3 rounded-t-2xl border-b border-indigo-100 bg-indigo-50 px-5 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">🤖 Lecture AI</h2>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Lecture AI</h2>
           <p className="text-xs text-slate-600">Answers using this lecture&apos;s slides and objectives.</p>
         </div>
-        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
-          🔒 Private to you
+        <span className="shrink-0 rounded-none bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
+          Private to you
         </span>
       </header>
 
@@ -137,7 +137,7 @@ export function AiChat({ lectureId }: { lectureId: string }) {
                   key={s}
                   type="button"
                   onClick={() => void ask(s)}
-                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-indigo-600"
+                  className="rounded-none bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-indigo-100 focus-visible:outline-2 focus-visible:outline-indigo-600"
                 >
                   {s}
                 </button>
