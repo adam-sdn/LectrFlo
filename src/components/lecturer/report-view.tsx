@@ -75,7 +75,7 @@ export function ReportView({ lectureId }: { lectureId: string }) {
       </div>
 
       <Card
-        title={<span className="flex items-center gap-2">✨ AI insight report</span>}
+        title="AI insight report"
         action={
           content && (
             <Button variant="ghost" onClick={() => generate(true)} disabled={generating}>
@@ -165,8 +165,8 @@ export function ReportView({ lectureId }: { lectureId: string }) {
               return (
                 <li key={c.slideNumber} className="flex items-center gap-3 text-sm">
                   <span className="w-16 shrink-0 text-slate-600">Slide {c.slideNumber}</span>
-                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                    <span className="block h-full rounded-full bg-rose-400" style={{ width: `${Math.min(100, pct)}%` }} />
+                  <span className="h-2 flex-1 overflow-hidden rounded-none bg-slate-100">
+                    <span className="block h-full rounded-none bg-rose-400" style={{ width: `${Math.min(100, pct)}%` }} />
                   </span>
                   <span className="w-24 shrink-0 text-right tabular-nums text-slate-700">
                     {c.uniqueStudents} student{c.uniqueStudents === 1 ? "" : "s"}
@@ -183,9 +183,9 @@ export function ReportView({ lectureId }: { lectureId: string }) {
 
 function Stat({ label, value }: { label: string; value: number | undefined }) {
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-1 text-3xl font-bold tabular-nums">{value ?? "–"}</p>
+    <div className="border border-slate-200 bg-white p-6">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+      <p className="mt-1 font-display text-4xl font-semibold tabular-nums">{value ?? "–"}</p>
     </div>
   );
 }

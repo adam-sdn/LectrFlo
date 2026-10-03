@@ -181,11 +181,11 @@ export default function StudentLecturePage() {
             )}
 
             {objectives.length > 0 && (
-              <Card title="🎯 Learning objectives">
+              <Card title="Learning objectives">
                 <ol className="space-y-2">
                   {objectives.map((o, i) => (
                     <li key={o.id} className="flex gap-3 text-sm text-slate-700">
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-700">
+                      <span className="flex size-6 shrink-0 items-center justify-center border border-indigo-200 bg-indigo-50 font-display text-xs font-semibold text-indigo-700">
                         {i + 1}
                       </span>
                       {o.text}

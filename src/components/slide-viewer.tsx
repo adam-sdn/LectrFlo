@@ -23,7 +23,7 @@ export function SlideViewer({
   const showImage = url && failedUrl !== url;
 
   return (
-    <figure className="overflow-hidden rounded-2xl bg-slate-900 shadow-sm ring-1 ring-slate-200">
+    <figure className="overflow-hidden rounded-2xl bg-slate-900 ring-1 ring-slate-200">
       <div className="relative aspect-video w-full">
         {showImage ? (
           // Signed Supabase Storage URLs; next/image optimisation adds nothing for these.

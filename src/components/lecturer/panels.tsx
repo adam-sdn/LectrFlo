@@ -173,13 +173,13 @@ export function StudentsCard({
 }) {
   const recent = [...participants].reverse().slice(0, 8);
   return (
-    <Card title="Students connected" action={<span className="text-2xl font-bold tabular-nums">{count}</span>}>
+    <Card title="Students connected" action={<span className="font-display text-3xl font-semibold tabular-nums">{count}</span>}>
       {count === 0 ? (
         <p className="text-sm text-slate-500">Waiting for students to join…</p>
       ) : (
         <ul className="flex flex-wrap gap-1.5" aria-label="Recently joined students">
           {recent.map((p, i) => (
-            <li key={`${p.joinedAt}-${i}`} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+            <li key={`${p.joinedAt}-${i}`} className="rounded-none bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
               {p.displayName}
             </li>
           ))}
@@ -205,26 +205,26 @@ export function ConfusionMeter({ summary, participantCount }: { summary: Confusi
   const ratio = total > 0 ? confused / total : 0;
   const level = confused === 0 ? "clear" : ratio >= 0.25 || confused >= 3 ? "high" : "some";
   const styles = {
-    clear: { ring: "ring-emerald-200 bg-emerald-50", text: "text-emerald-700", bar: "bg-emerald-500", label: "No confusion on this slide" },
-    some: { ring: "ring-amber-200 bg-amber-50", text: "text-amber-700", bar: "bg-amber-500", label: "Some students are confused" },
-    high: { ring: "ring-rose-300 bg-rose-50", text: "text-rose-700", bar: "bg-rose-500", label: "Many students are confused — consider re-explaining" },
+    clear: { ring: "border-emerald-200 bg-emerald-50", text: "text-emerald-700", bar: "bg-emerald-500", label: "No confusion on this slide" },
+    some: { ring: "border-amber-200 bg-amber-50", text: "text-amber-700", bar: "bg-amber-500", label: "Some students are confused" },
+    high: { ring: "border-rose-300 bg-rose-50", text: "text-rose-700", bar: "bg-rose-500", label: "Many students are confused — consider re-explaining" },
   }[level];
   const totals = summary.bySlide.filter((s) => s.uniqueStudents > 0);
 
   return (
-    <section className={`rounded-2xl p-5 shadow-sm ring-1 ${styles.ring}`} aria-live="polite">
+    <section className={`border p-6 ${styles.ring}`} aria-live="polite">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-sm font-semibold text-slate-900">🤔 I&apos;m confused</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">I&apos;m confused</h2>
         <span className="text-xs text-slate-500">Slide {summary.currentSlide} · last {Math.round(summary.windowSeconds / 60)} min</span>
       </div>
-      <p className={`mt-2 text-5xl font-bold tabular-nums ${styles.text}`}>
+      <p className={`mt-2 font-display text-6xl font-semibold tabular-nums ${styles.text}`}>
         {confused}
         <span className="ml-2 text-base font-medium text-slate-500">
           of {total} student{total === 1 ? "" : "s"}
         </span>
       </p>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/80" aria-hidden>
-        <div className={`h-full rounded-full transition-all ${styles.bar}`} style={{ width: `${Math.min(100, ratio * 100)}%` }} />
+      <div className="mt-3 h-2 overflow-hidden rounded-none bg-white/80" aria-hidden>
+        <div className={`h-full rounded-none transition-all ${styles.bar}`} style={{ width: `${Math.min(100, ratio * 100)}%` }} />
       </div>
       <p className={`mt-2 text-sm font-medium ${styles.text}`}>{styles.label}</p>
       {totals.length > 0 && (
