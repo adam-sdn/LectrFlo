@@ -95,7 +95,7 @@ QR codes should encode a student page URL containing the join code; that page ca
 
 ## AI behaviour
 
-- Provider: Gemini REST API, enabled by `GEMINI_API_KEY` (`GEMINI_MODEL` defaults to `gemini-3.8-flash`; transient 429/500/503 errors are retried once).
+- Provider: Gemini REST API, enabled by `GEMINI_API_KEY` (`GEMINI_MODEL` defaults to Gemma 4 `gemma-4-26b-a4b-it`, sent with `thinkingLevel: "minimal"` for speed, configurable via `GEMINI_THINKING_LEVEL`; each request has a 55 s budget and transient 429/500/503 errors are retried once if time allows).
   Swap providers in `src/lib/ai/provider.ts`.
 - Lecture AI context: lecture title/module/description, objectives, text of revealed slides,
   the current slide image, and the student's last 10 completed messages. Never other students' data.
