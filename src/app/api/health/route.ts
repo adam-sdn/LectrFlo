@@ -20,6 +20,19 @@ const keyKind = (key: string | undefined) =>
           ? "legacy JWT key"
           : "unrecognised format";
 
+const TABLES = [
+  "lectures",
+  "lecture_slides",
+  "learning_objectives",
+  "lecture_participants",
+  "student_notes",
+  "slide_annotations",
+  "student_questions",
+  "confusion_signals",
+  "ai_messages",
+  "ai_reports",
+];
+
 // 1x1 transparent PNG used for the storage write test.
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -71,6 +84,17 @@ export const GET = route(async (req) => {
     if (error?.code === "23503") return "insert permitted";
     if (error) throw new Error(`${error.code ?? ""} ${error.message}`.trim());
     return "insert permitted";
+  });
+  checks.databaseTables = await run(async () => {
+    const results = await Promise.all(
+      // A zero-row read (not a HEAD count, which reports missing tables as empty) surfaces real errors.
+      TABLES.map(async (table) => ({ table, error: (await db.from(table).select("*").limit(0)).error })),
+    );
+    const missing = results.filter((r) => r.error).map((r) => `${r.table} (${r.error?.code ?? r.error?.message})`);
+    if (missing.length) {
+      throw new Error(`missing or unreadable: ${missing.join(", ")}. Re-run supabase/migrations/20261003000000_init.sql`);
+    }
+    return `all ${TABLES.length} tables present`;
   });
   checks.slideBucket = await run(async () => {
     const { data, error } = await db.storage.getBucket(SLIDES_BUCKET);
