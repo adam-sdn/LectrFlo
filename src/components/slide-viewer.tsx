@@ -9,11 +9,14 @@ export function SlideViewer({
   slideNumber,
   slideCount,
   placeholder,
+  onImageError,
 }: {
   slide: Slide | undefined;
   slideNumber: number;
   slideCount: number;
   placeholder?: string;
+  /** Called when the image fails (e.g. an expired signed URL) so the page can refetch. */
+  onImageError?: (url: string) => void;
 }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const url = slide?.imageUrl ?? null;
@@ -26,16 +29,18 @@ export function SlideViewer({
           // Signed Supabase Storage URLs; next/image optimisation adds nothing for these.
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            key={url}
             src={url}
             alt={`Lecture slide ${slideNumber}`}
             className="absolute inset-0 size-full object-contain"
-            onError={() => setFailedUrl(url)}
+            onError={() => {
+              setFailedUrl(url);
+              onImageError?.(url);
+            }}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-slate-300">
             {failedUrl === url && url
-              ? "This slide couldn't be loaded. It will refresh automatically."
+              ? "This slide couldn't be loaded."
               : (placeholder ?? (slideCount === 0 ? "No slides uploaded yet" : "Slide unavailable"))}
           </div>
         )}

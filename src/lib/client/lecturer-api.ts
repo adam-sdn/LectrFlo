@@ -14,31 +14,64 @@ import { ClientApiError, apiRequest } from "./http";
 
 const DEMO_LECTURER_NAME = "Demo Lecturer";
 
+let signingIn: Promise<string> | null = null;
+let recovery: { from: string; promise: Promise<string> } | null = null;
+
+/** Creates an anonymous lecturer session; concurrent callers share one sign-in. */
+function signInFresh(): Promise<string> {
+  signingIn ??= (async () => {
+    const { data, error } = await browserClient().auth.signInAnonymously({
+      options: { data: { full_name: DEMO_LECTURER_NAME } },
+    });
+    if (error || !data.session) {
+      throw new ClientApiError(
+        401,
+        "lecturer_session_failed",
+        `Couldn't start a lecturer session${error ? `: ${error.message}` : ""}. Make sure anonymous sign-ins are enabled in Supabase.`,
+      );
+    }
+    return data.session.access_token;
+  })().finally(() => {
+    signingIn = null;
+  });
+  return signingIn;
+}
+
 /**
  * Returns an access token for the lecturer. The MVP has no sign-in screen, so a
  * Supabase anonymous session is created on first use; each browser owns the
  * lectures it creates and the API still enforces ownership.
  */
 async function lecturerToken(): Promise<string> {
-  const auth = browserClient().auth;
-  const { data } = await auth.getSession();
-  if (data.session) return data.session.access_token;
+  if (signingIn) return signingIn;
+  const { data } = await browserClient().auth.getSession();
+  return data.session?.access_token ?? signInFresh();
+}
 
-  const { data: created, error } = await auth.signInAnonymously({
-    options: { data: { full_name: DEMO_LECTURER_NAME } },
-  });
-  if (error || !created.session) {
-    throw new ClientApiError(
-      401,
-      "lecturer_session_failed",
-      `Couldn't start a lecturer session${error ? `: ${error.message}` : ""}. Make sure anonymous sign-ins are enabled in Supabase.`,
-    );
+/** Replaces a session the server rejected (e.g. the user was deleted) with a fresh one. */
+async function recoverSession(rejected: string): Promise<string> {
+  const { data } = await browserClient().auth.getSession();
+  if (data.session && data.session.access_token !== rejected) return data.session.access_token;
+  if (recovery?.from !== rejected) {
+    recovery = {
+      from: rejected,
+      promise: (async () => {
+        await browserClient().auth.signOut({ scope: "local" }).catch(() => undefined);
+        return signInFresh();
+      })(),
+    };
   }
-  return created.session.access_token;
+  return recovery.promise;
 }
 
 async function call<T>(path: string, opts: { method?: string; body?: unknown; form?: FormData } = {}) {
-  return apiRequest<T>(path, { ...opts, token: await lecturerToken() });
+  const token = await lecturerToken();
+  try {
+    return await apiRequest<T>(path, { ...opts, token });
+  } catch (err) {
+    if (!(err instanceof ClientApiError && err.status === 401 && err.code === "unauthenticated")) throw err;
+    return apiRequest<T>(path, { ...opts, token: await recoverSession(token) });
+  }
 }
 
 export const lecturerApi = {
@@ -46,6 +79,7 @@ export const lecturerApi = {
   createLecture: (input: { title: string; module?: string; description?: string }) =>
     call<{ lecture: LecturerLecture }>("/api/lectures", { method: "POST", body: input }),
   getLecture: (id: string) => call<{ lecture: LecturerLectureDetail }>(`/api/lectures/${id}`),
+  deleteLecture: (id: string) => call<void>(`/api/lectures/${id}`, { method: "DELETE" }),
   lifecycle: (id: string, action: "open" | "start" | "end") =>
     call<{ lecture: LecturerLecture }>(`/api/lectures/${id}/lifecycle`, { method: "POST", body: { action } }),
   setSlide: (id: string, slideNumber: number) =>

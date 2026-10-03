@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SlideViewer } from "@/components/slide-viewer";
 import { AiChat } from "@/components/student/ai-chat";
 import { AskLecturer, ConfusedButton } from "@/components/student/interaction-panels";
-import { NotesPanel } from "@/components/student/notes-panel";
+import { NotesPanel, type NotesHandle } from "@/components/student/notes-panel";
 import { AppHeader, Card, ConnectionDot, ErrorNotice, LoadingScreen, StatusBadge } from "@/components/ui";
-import { useInterval, useRealtimeChannel } from "@/lib/client/hooks";
+import { useCoalescedRefresh, useInterval, useRealtimeChannel } from "@/lib/client/hooks";
 import { ClientApiError, errorMessage } from "@/lib/client/http";
+import { createSlideUrlCache } from "@/lib/client/slide-url-cache";
 import { studentApi } from "@/lib/client/student-api";
 import type { LectureChannelEvents } from "@/lib/realtime";
 import type { StudentLectureState } from "@/lib/types";
@@ -18,36 +19,62 @@ export default function StudentLecturePage() {
   const { lectureId } = useParams<{ lectureId: string }>();
   const [state, setState] = useState<StudentLectureState | null>(null);
   const [error, setError] = useState<{ text: string; notJoined: boolean } | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [urlCache] = useState(createSlideUrlCache);
+  const loadVersion = useRef(0);
+  const notesRef = useRef<NotesHandle>(null);
 
   const load = useCallback(async () => {
+    const version = ++loadVersion.current;
     try {
-      setState(await studentApi.state(lectureId));
+      const next = await studentApi.state(lectureId);
+      if (version !== loadVersion.current) return;
+      setState({ ...next, slides: urlCache.stabilize(next.slides) });
       setError(null);
     } catch (err) {
+      if (version !== loadVersion.current) return;
       const notJoined = err instanceof ClientApiError && (err.status === 401 || err.status === 404);
       setError({ text: notJoined ? "You haven't joined this lecture on this device, or your session expired." : errorMessage(err), notJoined });
     }
-  }, [lectureId]);
+  }, [lectureId, urlCache]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
-  // Events are hints: refetch to pick up newly revealed slide URLs. Polling covers missed events.
+  // The lecture channel is public, so events are only a hint to refetch (coalesced to avoid request storms).
+  const requestLoad = useCoalescedRefresh(load);
   const connection = useRealtimeChannel<LectureChannelEvents>(
     state?.realtime.channel ?? null,
     {
-      lecture_state: (p) => {
-        setState((s) => (s ? { ...s, lecture: { ...s.lecture, ...p } } : s));
-        void load();
-      },
-      slides_updated: () => void load(),
-      objectives_updated: () => void load(),
+      lecture_state: () => requestLoad(),
+      slides_updated: () => requestLoad(),
+      objectives_updated: () => requestLoad(),
     },
-    load,
+    requestLoad,
   );
   useInterval(() => void load(), state?.lecture.status === "ended" ? 120_000 : 15_000, Boolean(state));
+
+  const onImageError = useCallback(
+    (url: string) => {
+      if (urlCache.invalidate(url)) requestLoad();
+    },
+    [urlCache, requestLoad],
+  );
+
+  async function downloadNotes() {
+    setDownloading(true);
+    try {
+      await notesRef.current?.flush();
+    } finally {
+      setDownloading(false);
+    }
+    const link = document.createElement("a");
+    link.href = studentApi.exportUrl(lectureId);
+    link.download = "";
+    link.click();
+  }
 
   if (!state) {
     return (
@@ -106,12 +133,14 @@ export default function StudentLecturePage() {
               <p className="font-semibold">This lecture has ended.</p>
               <p className="text-sm text-slate-300">Your notes are saved. You can keep asking Lecture AI to review.</p>
             </div>
-            <a
-              href={studentApi.exportUrl(lectureId)}
-              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            <button
+              type="button"
+              onClick={downloadNotes}
+              disabled={downloading}
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-70"
             >
-              Download my notes
-            </a>
+              {downloading ? "Saving notes…" : "Download my notes"}
+            </button>
           </div>
         )}
 
@@ -124,7 +153,12 @@ export default function StudentLecturePage() {
                 <p className="mt-2 text-sm text-indigo-200">The first slide will appear here automatically.</p>
               </div>
             ) : (
-              <SlideViewer slide={slide} slideNumber={lecture.currentSlide} slideCount={lecture.slideCount} />
+              <SlideViewer
+                slide={slide}
+                slideNumber={lecture.currentSlide}
+                slideCount={lecture.slideCount}
+                onImageError={onImageError}
+              />
             )}
 
             {!ended && (
@@ -152,7 +186,7 @@ export default function StudentLecturePage() {
 
           <div className="space-y-4 lg:col-span-5">
             <AiChat lectureId={lectureId} />
-            <NotesPanel lectureId={lectureId} />
+            <NotesPanel lectureId={lectureId} ref={notesRef} />
           </div>
         </div>
       </main>

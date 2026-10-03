@@ -197,20 +197,26 @@ export async function renderDemoSlides(): Promise<Blob[]> {
 
 /** Creates the demo lecture through the regular lecturer API and returns its id. */
 export async function createDemoLecture(onStep: (step: string) => void): Promise<string> {
+  onStep("Rendering slides…");
+  const blobs = await renderDemoSlides();
   onStep("Creating lecture…");
   const { lecture } = await lecturerApi.createLecture({
     title: DEMO_LECTURE.title,
     module: DEMO_LECTURE.module,
     description: DEMO_LECTURE.description,
   });
-  onStep("Rendering slides…");
-  const blobs = await renderDemoSlides();
-  onStep("Uploading slides…");
-  await lecturerApi.uploadSlides(lecture.id, blobs);
-  onStep("Adding slide text and objectives…");
-  await Promise.all([
-    ...SLIDES.map((slide, i) => lecturerApi.setSlideText(lecture.id, i + 1, slide.text)),
-    lecturerApi.setObjectives(lecture.id, DEMO_LECTURE.objectives),
-  ]);
+  try {
+    onStep("Uploading slides…");
+    await lecturerApi.uploadSlides(lecture.id, blobs);
+    onStep("Adding slide text and objectives…");
+    await Promise.all([
+      ...SLIDES.map((slide, i) => lecturerApi.setSlideText(lecture.id, i + 1, slide.text)),
+      lecturerApi.setObjectives(lecture.id, DEMO_LECTURE.objectives),
+    ]);
+  } catch (err) {
+    // Don't leave a half-built demo lecture in the list.
+    await lecturerApi.deleteLecture(lecture.id).catch(() => undefined);
+    throw err;
+  }
   return lecture.id;
 }

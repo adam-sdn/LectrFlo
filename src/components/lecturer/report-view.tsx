@@ -11,19 +11,23 @@ import type { LecturerReportResponse } from "@/lib/types";
 export function ReportView({ lectureId }: { lectureId: string }) {
   const [data, setData] = useState<LecturerReportResponse | null>(null);
   const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [aiUnavailable, setAiUnavailable] = useState(false);
+  const [stalled, setStalled] = useState(false);
   const autoStarted = useRef(false);
 
+  // regenerate=true only replaces a finished report; failed or stalled ones are retried with false.
   const generate = useCallback(
     async (regenerate: boolean) => {
       setGenerating(true);
-      setError(null);
+      setGenerateError(null);
+      setStalled(false);
       try {
         setData(await lecturerApi.generateReport(lectureId, regenerate));
       } catch (err) {
         if (err instanceof ClientApiError && err.code === "ai_unavailable") setAiUnavailable(true);
-        else setError(errorMessage(err));
+        else setGenerateError(errorMessage(err));
       } finally {
         setGenerating(false);
       }
@@ -35,12 +39,16 @@ export function ReportView({ lectureId }: { lectureId: string }) {
     try {
       const result = await lecturerApi.getReport(lectureId);
       setData(result);
-      if (!result.report && !autoStarted.current) {
+      setLoadError(null);
+      const report = result.report;
+      // The server takes over a pending report after 2 minutes; offer a retry instead of spinning forever.
+      setStalled(report?.status === "pending" && Date.now() - Date.parse(report.updatedAt) > 150_000);
+      if (!report && !autoStarted.current) {
         autoStarted.current = true;
         await generate(false);
       }
     } catch (err) {
-      setError(errorMessage(err));
+      setLoadError(errorMessage(err));
     }
   }, [lectureId, generate]);
 
@@ -50,7 +58,7 @@ export function ReportView({ lectureId }: { lectureId: string }) {
   }, [load]);
 
   // Another tab may be generating; poll until it settles.
-  useInterval(() => void load(), 3000, data?.report?.status === "pending" && !generating);
+  useInterval(() => void load(), 3000, data?.report?.status === "pending" && !generating && !stalled);
 
   const report = data?.report;
   const content = report?.status === "complete" ? report.content : null;
@@ -76,7 +84,7 @@ export function ReportView({ lectureId }: { lectureId: string }) {
           )
         }
       >
-        {(generating || (!data && !error) || report?.status === "pending") && (
+        {(generating || (!data && !loadError) || (report?.status === "pending" && !stalled)) && (
           <div className="flex items-center gap-3 py-6 text-sm text-slate-600">
             <Spinner /> Analysing confusion signals and questions… this can take up to a minute.
           </div>
@@ -86,9 +94,13 @@ export function ReportView({ lectureId }: { lectureId: string }) {
             The AI report isn&apos;t available because no AI provider is configured on the server. The class statistics above are still accurate.
           </p>
         )}
-        {!generating && error && <ErrorNotice message={error} onRetry={() => generate(true)} />}
-        {!generating && report?.status === "failed" && (
-          <ErrorNotice message={report.error ?? "The report couldn't be generated."} onRetry={() => generate(true)} />
+        {loadError && <ErrorNotice message={`Couldn't load the report: ${loadError}`} onRetry={() => void load()} />}
+        {!generating && generateError && <ErrorNotice message={generateError} onRetry={() => generate(false)} />}
+        {!generating && !generateError && report?.status === "failed" && (
+          <ErrorNotice message={report.error ?? "The report couldn't be generated."} onRetry={() => generate(false)} />
+        )}
+        {!generating && stalled && (
+          <ErrorNotice message="Report generation didn't finish." onRetry={() => generate(false)} />
         )}
         {content && !generating && (
           <div className="space-y-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { Card, ErrorNotice, Spinner } from "@/components/ui";
 import { errorMessage } from "@/lib/client/http";
 import { studentApi } from "@/lib/client/student-api";
@@ -8,8 +8,13 @@ import { studentApi } from "@/lib/client/student-api";
 type SaveState = "saved" | "dirty" | "saving" | "error";
 const AUTOSAVE_MS = 800;
 
+export interface NotesHandle {
+  /** Saves any pending edits and resolves once the server has them (or the save failed). */
+  flush: () => Promise<void>;
+}
+
 /** Private notes, autosaved to the server (the source of truth) shortly after typing stops. */
-export function NotesPanel({ lectureId }: { lectureId: string }) {
+export function NotesPanel({ lectureId, ref }: { lectureId: string; ref?: Ref<NotesHandle> }) {
   const [content, setContent] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -18,7 +23,7 @@ export function NotesPanel({ lectureId }: { lectureId: string }) {
 
   const latest = useRef("");
   const saved = useRef("");
-  const inFlight = useRef(false);
+  const running = useRef<Promise<void> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -39,11 +44,11 @@ export function NotesPanel({ lectureId }: { lectureId: string }) {
     void load();
   }, [load]);
 
-  const save = useCallback(async () => {
+  const save = useCallback((): Promise<void> => {
     if (timer.current) clearTimeout(timer.current);
-    if (inFlight.current) return;
-    inFlight.current = true;
-    try {
+    if (running.current) return running.current;
+    if (latest.current === saved.current) return Promise.resolve();
+    const run = (async () => {
       // Keep going until the server has the latest text (typing may continue mid-request).
       while (latest.current !== saved.current) {
         const value = latest.current;
@@ -59,9 +64,36 @@ export function NotesPanel({ lectureId }: { lectureId: string }) {
         setSaveError(null);
       }
       setSaveState("saved");
-    } finally {
-      inFlight.current = false;
+    })().finally(() => {
+      running.current = null;
+    });
+    running.current = run;
+    return run;
+  }, [lectureId]);
+
+  useImperativeHandle(ref, () => ({ flush: save }), [save]);
+
+  // Pick up edits made in another tab, but never over unsaved local text.
+  useEffect(() => {
+    async function refresh() {
+      if (document.visibilityState !== "visible" || running.current || latest.current !== saved.current) return;
+      const before = latest.current;
+      try {
+        const { notes } = await studentApi.notes(lectureId);
+        if (running.current || latest.current !== before || notes.content === before) return;
+        latest.current = notes.content;
+        saved.current = notes.content;
+        setContent(notes.content);
+      } catch {
+        // Keep the current text; the next focus retries.
+      }
     }
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, [lectureId]);
 
   function onChange(value: string) {

@@ -82,3 +82,45 @@ export function useCooldown(): [number, (seconds: number) => void] {
   }, []);
   return [remaining, start];
 }
+
+/**
+ * Wraps an async refresh so bursts of triggers (realtime events, polls) collapse into
+ * at most one in-flight run plus one trailing run, spaced at least `minGapMs` apart.
+ */
+export function useCoalescedRefresh(fn: () => Promise<void>, minGapMs = 1000): () => void {
+  const fnRef = useRef(fn);
+  useEffect(() => {
+    fnRef.current = fn;
+  });
+  const state = useRef({ running: false, queued: false, last: 0, timer: null as ReturnType<typeof setTimeout> | null });
+  useEffect(() => {
+    const s = state.current;
+    return () => {
+      if (s.timer) clearTimeout(s.timer);
+    };
+  }, []);
+
+  return useCallback(() => {
+    const s = state.current;
+    const schedule = () => {
+      s.timer = setTimeout(run, Math.max(0, s.last + minGapMs - Date.now()));
+    };
+    const run = async () => {
+      s.timer = null;
+      s.running = true;
+      s.queued = false;
+      s.last = Date.now();
+      try {
+        await fnRef.current();
+      } finally {
+        s.running = false;
+        if (s.queued) schedule();
+      }
+    };
+    if (s.running || s.timer) {
+      s.queued = true;
+      return;
+    }
+    schedule();
+  }, [minGapMs]);
+}

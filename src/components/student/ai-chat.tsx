@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Button, ErrorNotice, Spinner } from "@/components/ui";
+import { useInterval } from "@/lib/client/hooks";
 import { ClientApiError, errorMessage } from "@/lib/client/http";
 import { studentApi } from "@/lib/client/student-api";
 import type { AiMessage } from "@/lib/types";
@@ -18,7 +19,8 @@ export function AiChat({ lectureId }: { lectureId: string }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<{ text: string; retry?: string } | null>(null);
   const [unavailable, setUnavailable] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const [gaveUpWaiting, setGaveUpWaiting] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -34,9 +36,29 @@ export function AiChat({ lectureId }: { lectureId: string }) {
     void load();
   }, [load]);
 
+  // Scroll the message list itself (never the page) to the newest message.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "nearest" });
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
   }, [messages, sending]);
+
+  // A reply can still be in progress after a page refresh: poll until it lands (up to ~2 minutes).
+  const last = messages?.at(-1);
+  const waitingForReply = !sending && last?.role === "student" && last.status === "pending" && !last.local;
+  useInterval(
+    async () => {
+      try {
+        const { messages: fresh } = await studentApi.aiHistory(lectureId);
+        setMessages(fresh);
+        const newest = fresh.at(-1);
+        if (newest?.status === "pending" && Date.now() - Date.parse(newest.createdAt) > 120_000) setGaveUpWaiting(true);
+      } catch {
+        // Try again on the next tick.
+      }
+    },
+    3000,
+    waitingForReply && !gaveUpWaiting,
+  );
 
   async function ask(text: string) {
     const message = text.trim();
@@ -82,7 +104,7 @@ export function AiChat({ lectureId }: { lectureId: string }) {
   }
 
   return (
-    <section className="flex min-h-[28rem] flex-col rounded-2xl bg-white shadow-sm ring-1 ring-indigo-200 lg:h-[36rem]">
+    <section className="flex h-[30rem] flex-col rounded-2xl bg-white shadow-sm ring-1 ring-indigo-200 lg:h-[36rem]">
       <header className="flex items-start justify-between gap-3 rounded-t-2xl border-b border-indigo-100 bg-indigo-50 px-5 py-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-900">🤖 Lecture AI</h2>
@@ -93,7 +115,12 @@ export function AiChat({ lectureId }: { lectureId: string }) {
         </span>
       </header>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4" aria-live="polite" aria-label="Lecture AI conversation">
+      <div
+        ref={listRef}
+        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4"
+        aria-live="polite"
+        aria-label="Lecture AI conversation"
+      >
         {loadError && <ErrorNotice message={`Couldn't load your chat: ${loadError}`} onRetry={load} />}
         {!messages && !loadError && (
           <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -122,12 +149,15 @@ export function AiChat({ lectureId }: { lectureId: string }) {
             <div
               className={
                 m.role === "student"
-                  ? `max-w-[85%] rounded-2xl rounded-br-sm px-3.5 py-2 text-sm text-white ${m.status === "failed" ? "bg-slate-400" : "bg-indigo-600"}`
+                  ? `max-w-[85%] rounded-2xl rounded-br-sm px-3.5 py-2 text-sm ${m.status === "failed" ? "bg-rose-50 text-rose-950 ring-1 ring-rose-200" : "bg-indigo-600 text-white"}`
                   : "max-w-[90%] rounded-2xl rounded-bl-sm bg-slate-100 px-3.5 py-2 text-sm text-slate-800"
               }
             >
               {m.role === "assistant" ? <FormattedText text={m.content} /> : <p className="whitespace-pre-wrap">{m.content}</p>}
-              {m.status === "failed" && <p className="mt-1 text-[11px] text-white/90">Not answered</p>}
+              {m.status === "failed" && <p className="mt-1 text-xs font-medium text-rose-800">Not answered — try again</p>}
+              {m.status === "pending" && !m.local && m === last && (
+                <p className="mt-1 text-xs text-indigo-100">{gaveUpWaiting ? "No answer yet — ask again" : "Waiting for answer…"}</p>
+              )}
             </div>
           </div>
         ))}
@@ -136,7 +166,6 @@ export function AiChat({ lectureId }: { lectureId: string }) {
             <Spinner className="size-3" /> Lecture AI is thinking…
           </div>
         )}
-        <div ref={endRef} />
       </div>
 
       <div className="border-t border-slate-100 px-5 py-3">

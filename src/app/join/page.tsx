@@ -15,7 +15,12 @@ function JoinForm() {
   const params = useSearchParams();
   const [code, setCode] = useState(() => normalize(params.get("code") ?? ""));
   const [name, setName] = useState("");
-  const [preview, setPreview] = useState<{ code: string; lecture?: JoinPreview; error?: string } | null>(null);
+  const [preview, setPreview] = useState<{
+    code: string;
+    lecture?: JoinPreview;
+    joinedAs?: string;
+    error?: string;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,7 +33,14 @@ function JoinForm() {
     const timer = setTimeout(() => {
       studentApi
         .preview(cleanCode)
-        .then(({ lecture }) => !cancelled && setPreview({ code: cleanCode, lecture }))
+        .then(async ({ lecture }) => {
+          // This browser may already have a participant session for this lecture (cookie).
+          const joinedAs = await studentApi
+            .state(lecture.lectureId)
+            .then((state) => state.participant.displayName)
+            .catch(() => undefined);
+          if (!cancelled) setPreview({ code: cleanCode, lecture, joinedAs });
+        })
         .catch((err) => !cancelled && setPreview({ code: cleanCode, error: errorMessage(err) }));
     }, 250);
     return () => {
@@ -38,6 +50,7 @@ function JoinForm() {
   }, [cleanCode, codeComplete]);
 
   const currentPreview = preview?.code === cleanCode ? preview : null;
+  const joinedAs = currentPreview?.lecture && currentPreview.joinedAs;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -91,34 +104,50 @@ function JoinForm() {
         </div>
       </div>
 
-      <div>
-        <label htmlFor="name" className="block text-sm font-semibold text-slate-900">
-          Your name
-        </label>
-        <input
-          id="name"
-          name="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Sam Patel"
-          autoComplete="name"
-          maxLength={60}
-          className="mt-2 w-full rounded-xl border-0 px-4 py-3 text-base ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
-        />
-        <p className="mt-2 text-xs text-slate-500">Your notes and Lecture AI chat stay private to you.</p>
-      </div>
+      {joinedAs && currentPreview?.lecture ? (
+        <div className="space-y-3 rounded-xl bg-indigo-50 p-4 ring-1 ring-indigo-100">
+          <p className="text-sm text-slate-800">
+            This browser has already joined as <span className="font-semibold">{joinedAs}</span>.
+          </p>
+          <Button className="w-full py-3 text-base" onClick={() => router.push(`/lecture/${currentPreview.lecture!.lectureId}`)}>
+            Continue as {joinedAs}
+          </Button>
+          <p className="text-xs text-slate-600">
+            To join as a different student, use a private window or another browser. Each browser keeps one student&apos;s notes and AI chat.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div>
+            <label htmlFor="name" className="block text-sm font-semibold text-slate-900">
+              Your name
+            </label>
+            <input
+              id="name"
+              name="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Sam Patel"
+              autoComplete="name"
+              maxLength={60}
+              className="mt-2 w-full rounded-xl border-0 px-4 py-3 text-base ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+            />
+            <p className="mt-2 text-xs text-slate-500">Your notes and Lecture AI chat are private to you on this browser.</p>
+          </div>
 
-      {error && <ErrorNotice message={error} />}
+          {error && <ErrorNotice message={error} />}
 
-      <Button type="submit" disabled={submitting} className="w-full py-3 text-base">
-        {submitting ? (
-          <>
-            <Spinner /> Joining…
-          </>
-        ) : (
-          "Join lecture"
-        )}
-      </Button>
+          <Button type="submit" disabled={submitting} className="w-full py-3 text-base">
+            {submitting ? (
+              <>
+                <Spinner /> Joining…
+              </>
+            ) : (
+              "Join lecture"
+            )}
+          </Button>
+        </>
+      )}
     </form>
   );
 }
