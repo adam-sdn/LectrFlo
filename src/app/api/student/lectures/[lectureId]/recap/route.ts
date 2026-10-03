@@ -13,6 +13,9 @@ import { regenerateSchema } from "@/lib/validation";
 
 type Ctx = { params: Promise<{ lectureId: string }> };
 
+// AI calls can take a while; fits every Vercel plan.
+export const maxDuration = 60;
+
 async function respond(
   lecture: LectureRow,
   objectives: LearningObjective[],

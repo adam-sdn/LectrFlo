@@ -22,6 +22,8 @@ export class AiProviderError extends Error {}
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 const RETRYABLE_STATUSES = [429, 500, 503];
+// Two attempts plus the retry pause must fit within the routes' 60 s maxDuration (Vercel).
+const ATTEMPT_TIMEOUT_MS = 25_000;
 
 function geminiProvider(apiKey: string, model: string, baseUrl: string): AiProvider {
   async function call(body: string): Promise<Response> {
@@ -29,7 +31,7 @@ function geminiProvider(apiKey: string, model: string, baseUrl: string): AiProvi
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body,
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
     });
   }
 

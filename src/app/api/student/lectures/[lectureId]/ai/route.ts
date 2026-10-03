@@ -14,6 +14,9 @@ import { askAiSchema } from "@/lib/validation";
 
 type Ctx = { params: Promise<{ lectureId: string }> };
 
+// AI calls can take a while; fits every Vercel plan.
+export const maxDuration = 60;
+
 const HISTORY_TURNS = 10;
 
 /** The student's private Lecture AI conversation, oldest first. */

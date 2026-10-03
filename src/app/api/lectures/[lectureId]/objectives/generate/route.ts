@@ -9,6 +9,9 @@ import { downloadSlideImage } from "@/lib/storage";
 
 type Ctx = { params: Promise<{ lectureId: string }> };
 
+// AI calls can take a while; fits every Vercel plan.
+export const maxDuration = 60;
+
 const MAX_IMAGE_SLIDES = 12;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
