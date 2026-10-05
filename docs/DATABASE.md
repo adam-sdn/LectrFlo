@@ -1,4 +1,4 @@
-# LectrFlow Database
+# LectrFlo Database
 
 Supabase Postgres. Schema lives in `supabase/migrations/`; never edit the database by hand.
 
