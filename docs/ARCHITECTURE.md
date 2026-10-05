@@ -1,4 +1,4 @@
-# LectrFlow Architecture
+# LectrFlo Architecture
 
 Hackathon MVP. Keep it simple: one Next.js app, one Supabase project.
 

@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="public/brand/lectrflo-logo.png" alt="LectrFlo" width="180" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/lectrflo-logo-light.png" />
+  <img src="public/brand/lectrflo-logo.png" alt="LectrFlo" width="180" />
+</picture>
 
 # LectrFlo
 
@@ -8,7 +11,7 @@
 anonymously and get a private AI tutor that sees the slide on screen. Lecturers see the class
 react in real time and get an AI insight report when the lecture ends.
 
-[Live demo](https://lectr-flo.vercel.app) · [Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [Database](docs/DATABASE.md)
+[Live demo](https://lectr-flo.vercel.app) · [Demo video](docs/media/LectrFlo-demo.mp4) · [Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [Database](docs/DATABASE.md)
 
 ![Next.js](https://img.shields.io/badge/Next.js_16-000000?logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React_19-149ECA?logo=react&logoColor=white)
@@ -18,7 +21,9 @@ react in real time and get an AI insight report when the lecture ends.
 ![Gemma](https://img.shields.io/badge/AI-Gemma_4_(Gemini_API)-4285F4?logo=google&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Deployed_on-Vercel-000000?logo=vercel&logoColor=white)
 
-<img src="docs/images/live-lecture.jpg" alt="Lecturer console and student phone during a live lecture: the confusion meter shows 7 of 12 students confused while Lecture AI answers a student privately" width="900" />
+<a href="docs/media/LectrFlo-demo.mp4"><img src="docs/media/demo-preview.gif" alt="LectrFlo demo: the lecturer's laptop and a student's phone during a live lecture. Slides sync, the confusion meter turns red, Lecture AI answers privately and the AI insight report appears." width="900" /></a>
+
+**[▶ Watch the full 2½-minute demo](docs/media/LectrFlo-demo.mp4)** (1080p, captioned, no audio)
 
 </div>
 
@@ -42,12 +47,15 @@ lecturer finds out at the exam, and students revise from patchy notes with no on
 
 **For lecturers**
 
-- Create a lecture and open a lobby with a **join code and QR code** to project.
+- Start from a one-click demo lecture (the API also accepts your own slide images and text), then
+  open a lobby with a **join code and QR code** to project.
 - Present from the console. Every student's screen follows the slide **in real time**.
 - Watch students arrive, a live **confusion meter** ("Many students are confused, consider
   re-explaining") and an anonymous **question feed**.
-- End the lecture to get an **AI insight report**: confusion hotspots with likely causes,
-  question themes, recommendations for next time and confusion by slide.
+- End the lecture to get an **AI insight report** (confusion hotspots with likely causes, question
+  themes and recommendations for next time) alongside class stats and a confusion-by-slide chart.
+
+<img src="docs/images/live-lecture.jpg" alt="Lecturer console and student phone during a live lecture: the confusion meter shows 7 of 12 students confused while Lecture AI answers a student privately" />
 
 <table>
   <tr>
@@ -60,13 +68,13 @@ lecturer finds out at the exam, and students revise from patchy notes with no on
   </tr>
 </table>
 
-## Three AI agents, one live lecture
+## How the AI works
 
-| Agent | What it does | How it stays grounded |
+| Feature | What it does | How it stays grounded |
 | --- | --- | --- |
-| **Tutor** (text) | Answers each student privately during and after the lecture | Gets the current slide image, the text of the slides revealed so far (never the ones still to come) and the learning objectives |
-| **Voice tutor** | Spoken conversation through ElevenLabs Agents, with tools to mark confusion, ask the lecturer, save a note and read the current slide | Tools run in the browser through the same student API as the buttons, so the same permission checks and rate limits apply |
-| **Report** | Turns anonymous confusion signals and questions into hotspots, themes and next steps | Structured JSON output, saved as pending / complete / failed so a slow or failed run never blocks the page |
+| **Lecture AI tutor** | Answers each student privately during and after the lecture | Each answer gets the current slide image, the text of the slides revealed so far (never the ones still to come) and the learning objectives |
+| **Voice tutor** (agent with tools) | Spoken conversation through ElevenLabs Agents. It can mark the student as confused, ask the lecturer, save a note and read the current slide | The tools run in the browser through the same student API as the buttons, so the same permission checks and rate limits apply |
+| **Insight report** | Turns anonymous confusion signals and questions into hotspots, themes and next steps | Structured JSON output, saved as pending / complete / failed so a slow or failed run never blocks the page |
 
 ## Engineering highlights
 
@@ -75,14 +83,17 @@ lecturer finds out at the exam, and students revise from patchy notes with no on
   that validates input with zod and checks ownership (`requireOwnedLecture` / `requireParticipant`).
 - Row Level Security is enabled on every table, and the anon role can read nothing.
 - Students are anonymous per-lecture sessions: an httpOnly cookie, with only a SHA-256 hash of the
-  token stored. Composite foreign keys stop a student's rows from pointing at another lecture.
+  token stored. Composite foreign keys stop a student's notes, annotations, questions, confusion
+  signals and AI messages from pointing at another lecture.
 - Slides live in a private Storage bucket and are served through short-lived signed URLs.
 - The ElevenLabs API key never reaches the browser. The server hands out a short-lived signed URL.
 
 **Real time without trusting the client**
-- Supabase Realtime Broadcast on a public lecture channel plus a secret, lecturer-only channel.
-- Events are treated as hints to refetch. REST endpoints stay the source of truth, so a forged
-  broadcast can't change what anyone sees, and pages fall back to polling.
+- Supabase Realtime Broadcast on a public lecture channel, plus a lecturer-only channel whose key
+  only the owning lecturer receives.
+- Events on the public channel are only hints to refetch. REST endpoints stay the source of truth,
+  so a forged broadcast there can't change the slide or lecture state anyone sees, and pages fall
+  back to polling.
 
 **AI that fails gracefully**
 - One provider module wraps the Gemini API (Gemma 4) with JSON mode, a time budget that fits
@@ -95,8 +106,9 @@ lecturer finds out at the exam, and students revise from patchy notes with no on
 **Server-side PDF generation**
 - Built with pdf-lib and embedded, subset DejaVu fonts, so maths symbols (′ ∘ ⁿ → √) and accented
   names print correctly.
-- A custom layout engine wraps text in linear time (a 100,000-character note renders in under a
-  second), keeps headings with their content and dates the lecture in the student's time zone.
+- A custom layout engine wraps text in linear time (a pathological 100,000-character note went from
+  several minutes to about a second), keeps headings with their content and dates the lecture in
+  the student's time zone.
 
 **Operational polish**
 - `/api/health` reports configuration, database reads and writes, tables and the storage bucket,
@@ -168,7 +180,7 @@ docs/                       architecture, API and database docs
 
 ## Getting started
 
-Requires Node 20.9+ and, for a local database, Docker.
+Requires Node 22.12+ and, for a local database, Docker.
 
 ```bash
 npm install
@@ -192,7 +204,9 @@ Without them the app runs and those features say they aren't set up.
    safe to run again and ends with a check that should show `true` on every row.
 2. Turn on **Authentication → Sign In / Providers → Allow anonymous sign-ins**. Lecturers use an
    anonymous session in this version, and each browser owns the lectures it creates.
-3. Put the project URL, publishable key and secret key in `.env.local` (or your Vercel project).
+3. Set `NEXT_PUBLIC_SUPABASE_URL` (project URL), `NEXT_PUBLIC_SUPABASE_ANON_KEY` (publishable or
+   anon key) and `SUPABASE_SERVICE_ROLE_KEY` (secret or service-role key) in `.env.local` or your
+   Vercel project.
 4. Open `/api/health?write=1` on the deployed app to confirm everything is connected.
 
 </details>
@@ -224,14 +238,15 @@ access rules along the way, for example that one student can't read another's no
 - Lecturer sign-in and uploading your own slides (the API already accepts slide images and text).
 - UI for AI-suggested learning objectives and the per-student recap (both exist in the API).
 - Save voice tutor conversations alongside the text chat and include them in the PDF.
-- Tell the report agent how far through the deck the lecture got.
+- Tell the insight report how far through the deck the lecture got.
+- Run lint, type checks, tests and the build in CI (GitHub Actions) on every pull request.
 
 ## How it was built
 
-LectrFlo was built for a hackathon with AI coding agents (Codex and Claude Code) working in
-parallel on separate branches under the rules in [`AGENTS.md`](AGENTS.md), covering ownership,
-shared files, migrations and API contracts. Every change was gated on lint, type checks, unit tests,
-a production build and the end-to-end smoke test.
+LectrFlo was built for a hackathon using AI-assisted development with Claude Code, working under
+the multi-agent rules in [`AGENTS.md`](AGENTS.md): one branch per piece of work and clear ownership
+of shared files, migrations and API contracts. Changes were checked locally with lint, type checks,
+unit tests, a production build and the end-to-end smoke test before merging.
 
 ## Credits
 

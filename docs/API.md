@@ -1,4 +1,4 @@
-# LectrFlow API
+# LectrFlo API
 
 All endpoints are Next.js route handlers under `src/app/api`. Request and response
 bodies are JSON (camelCase). TypeScript shapes for every response live in
