@@ -23,7 +23,6 @@ react in real time and get an AI insight report when the lecture ends.
 
 <img src="docs/media/LectrFlo-demo.webp" alt="The full LectrFlo demo, playing on a loop: a lecturer's laptop and a student's phone side by side. The student joins with a code, follows the slides live and taps I'm confused, the confusion meter turns red, Lecture AI answers privately, the lecturer ends the lecture and gets an AI insight report, and the student downloads a PDF of their notes." width="900" />
 
-<sub>The full 2½-minute demo plays above on a loop. Prefer full resolution? <a href="docs/media/LectrFlo-demo.mp4">Download the 1080p video</a>.</sub>
 
 </div>
 
