@@ -209,13 +209,14 @@ export function AiChat({ lectureId }: { lectureId: string }) {
 /** Renders the light Markdown the model tends to use: paragraphs, bullet/numbered lists and **bold**. */
 function FormattedText({ text }: { text: string }) {
   const blocks: ReactNode[] = [];
-  let list: { ordered: boolean; items: string[] } | null = null;
+  // `start` keeps the model's own numbering when a numbered list is interrupted (e.g. by sub-bullets).
+  let list: { ordered: boolean; start: number; items: string[] } | null = null;
   const flush = () => {
     if (!list) return;
     const items = list.items.map((item, i) => <li key={i}>{inline(item)}</li>);
     blocks.push(
       list.ordered ? (
-        <ol key={blocks.length} className="list-decimal space-y-0.5 pl-5">{items}</ol>
+        <ol key={blocks.length} start={list.start} className="list-decimal space-y-0.5 pl-5">{items}</ol>
       ) : (
         <ul key={blocks.length} className="list-disc space-y-0.5 pl-5">{items}</ul>
       ),
@@ -225,14 +226,14 @@ function FormattedText({ text }: { text: string }) {
   for (const raw of text.split("\n")) {
     const line = raw.trim();
     const bullet = line.match(/^[-*•]\s+(.*)$/);
-    const numbered = line.match(/^\d+[.)]\s+(.*)$/);
+    const numbered = line.match(/^(\d+)[.)]\s+(.*)$/);
     if (bullet || numbered) {
       const ordered = Boolean(numbered);
       if (!list || list.ordered !== ordered) {
         flush();
-        list = { ordered, items: [] };
+        list = { ordered, start: numbered ? Number(numbered[1]) : 1, items: [] };
       }
-      list.items.push((bullet ?? numbered)![1]);
+      list.items.push(bullet ? bullet[1] : numbered![2]);
     } else {
       flush();
       if (line) blocks.push(<p key={blocks.length}>{inline(line.replace(/^#+\s*/, ""))}</p>);

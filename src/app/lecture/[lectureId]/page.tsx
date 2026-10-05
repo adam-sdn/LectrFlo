@@ -151,7 +151,7 @@ export default function StudentLecturePage() {
               disabled={downloading}
               className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-70"
             >
-              {downloading ? "Saving notes…" : "Download my notes"}
+              {downloading ? "Saving notes…" : "Download my notes (PDF)"}
             </button>
           </div>
         )}

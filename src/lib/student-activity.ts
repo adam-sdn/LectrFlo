@@ -4,6 +4,7 @@ import {
   AI_MESSAGE_COLUMNS,
   ANNOTATION_COLUMNS,
   QUESTION_COLUMNS,
+  toAiMessage,
   toAnnotation,
   toStudentQuestion,
   type AiMessageRow,
@@ -11,12 +12,14 @@ import {
   type QuestionRow,
 } from "@/lib/db";
 import { adminClient } from "@/lib/supabase/admin";
-import type { Annotation, StudentNotes, StudentQuestion } from "@/lib/types";
+import type { AiMessage, Annotation, StudentNotes, StudentQuestion } from "@/lib/types";
 
 export interface StudentActivityData {
   notes: StudentNotes;
   annotations: Annotation[];
   questions: StudentQuestion[];
+  /** The whole Lecture AI conversation (questions and answers), oldest first. */
+  aiMessages: AiMessage[];
   aiQuestions: string[];
   confusedSlides: number[];
 }
@@ -50,7 +53,6 @@ export async function loadStudentActivity(participantId: string): Promise<Studen
       .from("ai_messages")
       .select(AI_MESSAGE_COLUMNS)
       .eq("participant_id", participantId)
-      .eq("role", "student")
       .order("created_at")
       .returns<AiMessageRow[]>()
       .then(must),
@@ -65,7 +67,8 @@ export async function loadStudentActivity(participantId: string): Promise<Studen
     notes: { content: notes?.content ?? "", updatedAt: notes?.updated_at ?? null },
     annotations: annotations.map(toAnnotation),
     questions: questions.map(toStudentQuestion),
-    aiQuestions: aiMessages.map((m) => m.content),
+    aiMessages: aiMessages.map(toAiMessage),
+    aiQuestions: aiMessages.filter((m) => m.role === "student").map((m) => m.content),
     confusedSlides: [...new Set(confusion.map((c) => c.slide_number))].sort((a, b) => a - b),
   };
 }

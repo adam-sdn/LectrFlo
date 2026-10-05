@@ -23,10 +23,34 @@ export async function createSignedUrl(config: NonNullable<ReturnType<typeof voic
     throw new ApiError(502, "voice_failed", "The voice tutor couldn't start. Try again.");
   }
   if (!res.ok) {
-    console.error(`ElevenLabs signed URL request failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
-    throw new ApiError(502, "voice_failed", "The voice tutor couldn't start. Try again.");
+    const body = await res.text();
+    console.error(`ElevenLabs signed URL request failed (${res.status}): ${body.slice(0, 300)}`);
+    throw new ApiError(502, "voice_failed", signedUrlFailure(res.status, body));
   }
   const data = (await res.json()) as { signed_url?: string };
   if (!data.signed_url) throw new ApiError(502, "voice_failed", "The voice tutor couldn't start. Try again.");
   return data.signed_url;
+}
+
+/**
+ * Why ElevenLabs refused, so whoever is testing can fix the setup without digging through server logs.
+ * Only the HTTP status and ElevenLabs' short error code are shown, never the key or the raw response.
+ */
+export function signedUrlFailure(status: number, body: string): string {
+  let code = "";
+  try {
+    const detail = (JSON.parse(body) as { detail?: { status?: unknown } } | null)?.detail;
+    if (typeof detail?.status === "string" && /^[a-z_]{1,64}$/.test(detail.status)) code = detail.status;
+  } catch {
+    // Not JSON; the status alone still points at the cause.
+  }
+  const reason =
+    status === 401 || status === 403
+      ? "ElevenLabs refused the server's API key"
+      : status === 404
+        ? "ElevenLabs couldn't find the voice agent"
+        : status === 429
+          ? "ElevenLabs is over its usage or concurrency limit"
+          : "ElevenLabs returned an error";
+  return `The voice tutor couldn't start: ${reason} (${code ? `${status} ${code}` : status}).`;
 }
